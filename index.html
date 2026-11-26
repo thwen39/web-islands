@@ -681,9 +681,9 @@
 
     <!-- 訪客模式懸停預覽卡 -->
     <div id="visitor-tooltip" class="">
-      <h3 id="tooltip-title">技術筆記與部落格</h3>
-      <p id="tooltip-desc">前端開發、創意程式與日常隨筆</p>
-      <span class="link-hint" id="tooltip-url">https://example.com/blog ↗</span>
+      <h3 id="tooltip-title">設計作品集</h3>
+      <p id="tooltip-desc">UI/UX 設計、插畫與 3D 實驗專案展示</p>
+      <span class="link-hint" id="tooltip-url">https://example.com/portfolio ↗</span>
     </div>
 
     <!-- 操作提示 -->
@@ -734,7 +734,7 @@
               刪除島嶼
             </button>
           </div>
-          <div class="island-chips" id="island-list-chips"><button type="button" class="island-chip">關於我・燈塔主島</button><button type="button" class="island-chip">設計作品集</button><button type="button" class="island-chip active">技術筆記與部落格</button><button type="button" class="island-chip">數位工具百寶箱</button><button type="button" class="island-chip">靈感神社・留言板</button><button type="button" class="island-chip">象棋島</button><button type="button" class="island-chip">弓箭場</button><button type="button" class="island-chip">地鼠島</button><button type="button" class="island-chip">麻將最大島</button><button type="button" class="island-chip">咖啡烘培師島</button><button type="button" class="island-chip">塔羅占卜島</button><button type="button" class="island-chip">皇家德州撲克島</button><button type="button" class="island-chip">導演拍片場</button><button type="button" class="island-chip">BTS</button><button type="button" class="island-chip">Sky Teams(天合小隊)</button></div>
+          <div class="island-chips" id="island-list-chips"><button type="button" class="island-chip active">關於我・燈塔主島</button><button type="button" class="island-chip">設計作品集</button><button type="button" class="island-chip">技術筆記與部落格</button><button type="button" class="island-chip">數位工具百寶箱</button><button type="button" class="island-chip">靈感神社・留言板</button><button type="button" class="island-chip">象棋島</button><button type="button" class="island-chip">弓箭場</button><button type="button" class="island-chip">地鼠島</button><button type="button" class="island-chip">麻將最大島</button><button type="button" class="island-chip">咖啡烘培師島</button><button type="button" class="island-chip">塔羅占卜島</button><button type="button" class="island-chip">皇家德州撲克島</button><button type="button" class="island-chip">導演拍片場</button><button type="button" class="island-chip">BTS</button><button type="button" class="island-chip">Sky Teams(天合小隊)</button></div>
         </div>
 
         <!-- 2. 島嶼基本資訊與連結 -->
@@ -763,21 +763,21 @@
           <div class="section-title">⬡ 六角形地形與座標</div>
           <div class="form-row">
             <div class="form-group">
-              <label>左右位置 X <span id="val-x">9.5</span></label>
+              <label>左右位置 X <span id="val-x">0</span></label>
               <input type="range" id="input-x" min="-28" max="28" step="0.5">
             </div>
             <div class="form-group">
-              <label>前後位置 Z <span id="val-z">-7.5</span></label>
+              <label>前後位置 Z <span id="val-z">0</span></label>
               <input type="range" id="input-z" min="-28" max="28" step="0.5">
             </div>
           </div>
           <div class="form-row">
             <div class="form-group">
-              <label>島嶼半徑大小 <span id="val-radius">3.2</span></label>
+              <label>島嶼半徑大小 <span id="val-radius">4.6</span></label>
               <input type="range" id="input-radius" min="2.0" max="6.0" step="0.2">
             </div>
             <div class="form-group">
-              <label>島嶼海拔高度 <span id="val-height">1.1</span></label>
+              <label>島嶼海拔高度 <span id="val-height">1.4</span></label>
               <input type="range" id="input-height" min="0.6" max="3.0" step="0.1">
             </div>
           </div>
@@ -793,7 +793,7 @@
               </select>
             </div>
             <div class="form-group">
-              <label>六角旋轉角度 <span id="val-hexrot">60°</span></label>
+              <label>六角旋轉角度 <span id="val-hexrot">0°</span></label>
               <input type="range" id="input-hexrot" min="0" max="330" step="30">
             </div>
           </div>
@@ -824,7 +824,7 @@
           </div>
           <div class="form-row">
             <div class="form-group">
-              <label>建築朝向角度 <span id="val-brot">-30°</span></label>
+              <label>建築朝向角度 <span id="val-brot">30°</span></label>
               <input type="range" id="input-brot" min="0" max="360" step="15">
             </div>
             <div class="form-group">
@@ -834,11 +834,11 @@
           </div>
           <div class="form-row">
             <div class="form-group">
-              <label>島上左右偏移 <span id="val-bx">0.2</span></label>
+              <label>島上左右偏移 <span id="val-bx">-0.4</span></label>
               <input type="range" id="input-bx" min="-1.8" max="1.8" step="0.1">
             </div>
             <div class="form-group">
-              <label>島上前後偏移 <span id="val-bz">0.2</span></label>
+              <label>島上前後偏移 <span id="val-bz">-0.3</span></label>
               <input type="range" id="input-bz" min="-1.8" max="1.8" step="0.1">
             </div>
           </div>
@@ -862,7 +862,7 @@
               </select>
             </div>
             <div class="form-group">
-              <label>景觀豐富度 <span id="val-ncount">4</span></label>
+              <label>景觀豐富度 <span id="val-ncount">6</span></label>
               <input type="range" id="input-ncount" min="0" max="8" step="1">
             </div>
           </div>
@@ -1569,10 +1569,13 @@
         scene.add(cloudsGroup);
 
         /* =========================================================================
-         4. 海面生態（小帆船、跳躍海豚）與島際虛線航道
+         4. 海面與天空生態（智慧避障跨島帆船隊、跳躍海豚、海鷗群、巡航飛機）
          ========================================================================= */
         const seaLifeGroup = new THREE.Group();
         scene.add(seaLifeGroup);
+
+        const skyLifeGroup = new THREE.Group();
+        scene.add(skyLifeGroup);
 
         function createSailboat(sailColor) {
           const boat = new THREE.Group();
@@ -1591,34 +1594,41 @@
           });
 
           const hull = new THREE.Mesh(
-            new THREE.CylinderGeometry(0.45, 0.25, 0.35, 6),
+            new THREE.CylinderGeometry(0.42, 0.22, 0.32, 6),
             hullMat,
           );
-          hull.scale.set(0.8, 1, 2.2);
-          hull.position.y = 0.15;
+          hull.scale.set(0.8, 1, 2.1);
+          hull.position.y = 0.14;
 
           const deck = new THREE.Mesh(
-            new THREE.CylinderGeometry(0.4, 0.4, 0.08, 6),
+            new THREE.CylinderGeometry(0.37, 0.37, 0.08, 6),
             deckMat,
           );
-          deck.scale.set(0.75, 1, 2.1);
-          deck.position.y = 0.33;
+          deck.scale.set(0.75, 1, 2.0);
+          deck.position.y = 0.3;
 
           const mast = new THREE.Mesh(
-            new THREE.CylinderGeometry(0.03, 0.04, 1.45, 6),
+            new THREE.CylinderGeometry(0.028, 0.038, 1.35, 6),
             hullMat,
           );
-          mast.position.set(0, 0.95, 0.1);
+          mast.position.set(0, 0.88, 0.08);
 
           const mainSail = new THREE.Mesh(
-            new THREE.ConeGeometry(0.55, 1.15, 3),
+            new THREE.ConeGeometry(0.5, 1.05, 3),
             sailMat,
           );
-          mainSail.position.set(0, 1.0, -0.22);
+          mainSail.position.set(0, 0.92, -0.2);
           mainSail.rotation.y = Math.PI / 2;
           mainSail.scale.set(1, 1, 0.15);
 
-          boat.add(hull, deck, mast, mainSail);
+          // 船頭夜間航行小燈
+          const lantern = new THREE.Mesh(
+            new THREE.SphereGeometry(0.05, 6, 6),
+            new THREE.MeshBasicMaterial({ color: 0xfef08a }),
+          );
+          lantern.position.set(0, 0.38, 0.65);
+
+          boat.add(hull, deck, mast, mainSail, lantern);
           boat.traverse(function (c) {
             if (c.isMesh) {
               c.castShadow = true;
@@ -1628,25 +1638,282 @@
           return boat;
         }
 
-        const sailboats = [
-          {
-            mesh: createSailboat(0xffffff),
-            radiusX: 14.5,
-            radiusZ: 12.5,
-            speed: 0.14,
-            phase: 0,
-          },
-          {
-            mesh: createSailboat(0xff8c42),
-            radiusX: 18.0,
-            radiusZ: 15.5,
-            speed: -0.1,
-            phase: 2.5,
-          },
-        ];
-        sailboats.forEach(function (sb) {
-          seaLifeGroup.add(sb.mesh);
-        });
+        // 智慧避障帆船隊：隨島嶼數量自動擴編，在各島嶼間頻繁穿梭並繞開海岸線
+        const sailboats = [];
+        function rebuildSailboats() {
+          sailboats.forEach(function (sb) {
+            seaLifeGroup.remove(sb.mesh);
+          });
+          sailboats.length = 0;
+
+          const islands = appConfig.islands || [];
+          // 隨島嶼數量動態決定船隻數量（最少 5 艘，最多 12 艘），提升跨島航行頻率
+          const boatCount = Math.min(12, Math.max(5, islands.length + 2));
+          const sailColors = [
+            0xffffff, 0xff8c42, 0x38bdf8, 0xfef08a, 0xf472b6, 0x4ade80,
+          ];
+
+          for (let i = 0; i < boatCount; i++) {
+            const mesh = createSailboat(sailColors[i % sailColors.length]);
+            let startX = 0;
+            let startZ = 0;
+
+            // 尋找安全水域出生點（避開所有島嶼六角沙灘外緣）
+            for (let attempt = 0; attempt < 40; attempt++) {
+              const angle = (i / boatCount) * Math.PI * 2 + Math.random() * 0.8;
+              const dist = 6 + Math.random() * 16;
+              const tx = Math.cos(angle) * dist;
+              const tz = Math.sin(angle) * dist;
+              const blocked = islands.some(function (isl) {
+                const safeR = (isl.radius || 3.2) * 1.25 + 1.2;
+                return Math.hypot(tx - isl.x, tz - isl.z) < safeR;
+              });
+              if (!blocked) {
+                startX = tx;
+                startZ = tz;
+                break;
+              }
+            }
+
+            mesh.position.set(startX, 0.02, startZ);
+            seaLifeGroup.add(mesh);
+
+            const initAngle = Math.random() * Math.PI * 2;
+            const baseSpeed = 0.038 + Math.random() * 0.018;
+            sailboats.push({
+              mesh: mesh,
+              vx: Math.cos(initAngle) * baseSpeed,
+              vz: Math.sin(initAngle) * baseSpeed,
+              speed: baseSpeed,
+              targetIslandIdx: islands.length > 0 ? i % islands.length : -1,
+              portAngle: Math.random() * Math.PI * 2,
+              phase: Math.random() * Math.PI * 2,
+            });
+          }
+        }
+
+        // 海鷗群（3 群編隊在各島嶼上空盤旋振翅）
+        const seagulls = [];
+        function initSeagullFlocks() {
+          const birdBodyMat = new THREE.MeshStandardMaterial({
+            color: 0xffffff,
+            flatShading: true,
+          });
+          const birdWingMat = new THREE.MeshStandardMaterial({
+            color: 0xf1f5f9,
+            flatShading: true,
+            side: THREE.DoubleSide,
+          });
+          const beakMat = new THREE.MeshStandardMaterial({
+            color: 0xf59e0b,
+            flatShading: true,
+          });
+
+          const flockConfigs = [
+            {
+              cx: -4,
+              cz: -3,
+              rx: 11,
+              rz: 8,
+              height: 6.2,
+              speed: 0.24,
+              phase: 0,
+            },
+            {
+              cx: 5,
+              cz: 4,
+              rx: 12,
+              rz: 9,
+              height: 7.4,
+              speed: -0.2,
+              phase: 2.1,
+            },
+            {
+              cx: 0,
+              cz: 0,
+              rx: 16,
+              rz: 13,
+              height: 8.6,
+              speed: 0.17,
+              phase: 4.2,
+            },
+          ];
+
+          flockConfigs.forEach(function (flock, fIdx) {
+            const count = 4;
+            for (let b = 0; b < count; b++) {
+              const bird = new THREE.Group();
+              const body = new THREE.Mesh(
+                new THREE.ConeGeometry(0.11, 0.42, 5),
+                birdBodyMat,
+              );
+              body.rotation.x = Math.PI / 2;
+
+              const beak = new THREE.Mesh(
+                new THREE.ConeGeometry(0.04, 0.14, 4),
+                beakMat,
+              );
+              beak.rotation.x = Math.PI / 2;
+              beak.position.z = 0.26;
+
+              const leftWing = new THREE.Group();
+              const lw = new THREE.Mesh(
+                new THREE.BoxGeometry(0.42, 0.03, 0.16),
+                birdWingMat,
+              );
+              lw.position.x = -0.21;
+              leftWing.add(lw);
+
+              const rightWing = new THREE.Group();
+              const rw = new THREE.Mesh(
+                new THREE.BoxGeometry(0.42, 0.03, 0.16),
+                birdWingMat,
+              );
+              rw.position.x = 0.21;
+              rightWing.add(rw);
+
+              bird.add(body, beak, leftWing, rightWing);
+              skyLifeGroup.add(bird);
+
+              seagulls.push({
+                mesh: bird,
+                leftWing: leftWing,
+                rightWing: rightWing,
+                flock: flock,
+                offsetX: (b - 1.5) * 0.95,
+                offsetY: (b % 2) * 0.35,
+                offsetZ: Math.abs(b - 1.5) * 0.85,
+                flapOffset: b * 1.1 + fIdx,
+              });
+            }
+          });
+        }
+
+        // 天空巡航客機（2 架在不同高度與航線巡航，帶夜間翼尖燈）
+        const skyAirplanes = [];
+        function createSkyAirplane(stripeColor) {
+          const plane = new THREE.Group();
+          const whiteMat = new THREE.MeshStandardMaterial({
+            color: 0xf8fafc,
+            flatShading: true,
+            roughness: 0.4,
+          });
+          const stripeMat = new THREE.MeshStandardMaterial({
+            color: stripeColor,
+            flatShading: true,
+          });
+          const darkMat = new THREE.MeshStandardMaterial({
+            color: 0x1e293b,
+            flatShading: true,
+          });
+
+          const fuselage = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.16, 0.15, 1.35, 10),
+            whiteMat,
+          );
+          fuselage.rotation.x = Math.PI / 2;
+
+          const nose = new THREE.Mesh(
+            new THREE.ConeGeometry(0.16, 0.38, 10),
+            stripeMat,
+          );
+          nose.rotation.x = Math.PI / 2;
+          nose.position.z = 0.86;
+
+          const cockpit = new THREE.Mesh(
+            new THREE.BoxGeometry(0.18, 0.08, 0.22),
+            darkMat,
+          );
+          cockpit.position.set(0, 0.1, 0.62);
+
+          const mainWing = new THREE.Mesh(
+            new THREE.BoxGeometry(1.75, 0.04, 0.34),
+            whiteMat,
+          );
+          mainWing.position.set(0, -0.02, 0.08);
+
+          const wingTrim = new THREE.Mesh(
+            new THREE.BoxGeometry(1.76, 0.045, 0.08),
+            stripeMat,
+          );
+          wingTrim.position.set(0, -0.02, 0.22);
+
+          const tailWing = new THREE.Mesh(
+            new THREE.BoxGeometry(0.58, 0.03, 0.18),
+            whiteMat,
+          );
+          tailWing.position.set(0, 0.04, -0.58);
+
+          const tailFin = new THREE.Mesh(
+            new THREE.BoxGeometry(0.04, 0.36, 0.24),
+            stripeMat,
+          );
+          tailFin.position.set(0, 0.2, -0.54);
+
+          const redBeacon = new THREE.Mesh(
+            new THREE.SphereGeometry(0.035, 6, 6),
+            new THREE.MeshBasicMaterial({ color: 0xff2a55 }),
+          );
+          redBeacon.position.set(-0.88, 0, 0.08);
+
+          const greenBeacon = new THREE.Mesh(
+            new THREE.SphereGeometry(0.035, 6, 6),
+            new THREE.MeshBasicMaterial({ color: 0x00ff66 }),
+          );
+          greenBeacon.position.set(0.88, 0, 0.08);
+
+          plane.add(
+            fuselage,
+            nose,
+            cockpit,
+            mainWing,
+            wingTrim,
+            tailWing,
+            tailFin,
+            redBeacon,
+            greenBeacon,
+          );
+          plane.traverse(function (c) {
+            if (c.isMesh) c.castShadow = true;
+          });
+          return plane;
+        }
+
+        function initSkyAirplanes() {
+          const configs = [
+            {
+              color: 0x0284c7,
+              rx: 22,
+              rz: 16,
+              alt: 10.5,
+              speed: 0.16,
+              phase: 0.5,
+            },
+            {
+              color: 0xef4444,
+              rx: 26,
+              rz: 20,
+              alt: 12.8,
+              speed: -0.13,
+              phase: 3.4,
+            },
+          ];
+          configs.forEach(function (cfg) {
+            const mesh = createSkyAirplane(cfg.color);
+            skyLifeGroup.add(mesh);
+            skyAirplanes.push({
+              mesh: mesh,
+              rx: cfg.rx,
+              rz: cfg.rz,
+              alt: cfg.alt,
+              speed: cfg.speed,
+              phase: cfg.phase,
+            });
+          });
+        }
+
+        initSeagullFlocks();
+        initSkyAirplanes();
 
         function createDolphin() {
           const dolphin = new THREE.Group();
@@ -1857,7 +2124,6 @@
 
           delete assetMap[assetKey];
 
-          // 檢查是否有島嶼正在使用被刪除的物件，自動安全切回內建預設值
           let affectedCount = 0;
           appConfig.islands.forEach(function (isl) {
             if (category === "buildings" && isl.buildingType === assetKey) {
@@ -2526,7 +2792,6 @@
           glowWhiteMat.userData.nightBoost = 0.65;
           nightEmissiveMaterials.push(glowWhiteMat);
 
-          // 夜晚會有強烈紅色霓虹效果的材質
           const neonRedMat = new THREE.MeshStandardMaterial({
             color: 0xff1e42,
             emissive: 0xff0033,
@@ -2537,7 +2802,6 @@
           neonRedMat.userData.nightBoost = 2.2;
           nightEmissiveMaterials.push(neonRedMat);
 
-          // 【新增】夜晚會有強烈綠色霓虹效果的材質（用於麻將「發」字）
           const neonGreenMat = new THREE.MeshStandardMaterial({
             color: 0x10b981,
             emissive: 0x00ff66,
@@ -2572,7 +2836,7 @@
             window: createWindowMat(),
             glowWhite: glowWhiteMat,
             neonRed: neonRedMat,
-            neonGreen: neonGreenMat, // <--- 記得加上這一行
+            neonGreen: neonGreenMat,
             crystal: new THREE.MeshStandardMaterial({
               color: crystalColorHex || 0x38bdf8,
               emissive: crystalColorHex || 0x0284c7,
@@ -3112,6 +3376,7 @@
           });
 
           rebuildSeaRoutes();
+          rebuildSailboats();
 
           document.getElementById("display-site-title").textContent =
             appConfig.siteTitle || "夢幻群島導航站";
@@ -3329,21 +3594,122 @@
             if (cloud.position.x > 50) cloud.position.x = -50;
           });
 
+          // 1. 智慧避障帆船隊更新（島嶼間往返航行 + 海岸線安全緩衝繞行）
+          const islands = appConfig.islands || [];
           sailboats.forEach(function (sb) {
-            const t = elapsed * sb.speed + sb.phase;
-            const nx = Math.cos(t) * sb.radiusX;
-            const nz = Math.sin(t) * sb.radiusZ;
-            const nextT = t + (sb.speed > 0 ? 0.05 : -0.05);
-            const nextX = Math.cos(nextT) * sb.radiusX;
-            const nextZ = Math.sin(nextT) * sb.radiusZ;
+            if (islands.length > 0) {
+              if (
+                sb.targetIslandIdx < 0 ||
+                sb.targetIslandIdx >= islands.length
+              ) {
+                sb.targetIslandIdx = Math.floor(Math.random() * islands.length);
+              }
+              const targetIsl = islands[sb.targetIslandIdx];
+              const portRadius = (targetIsl.radius || 3.2) * 1.25 + 1.45;
+              const tx = targetIsl.x + Math.cos(sb.portAngle) * portRadius;
+              const tz = targetIsl.z + Math.sin(sb.portAngle) * portRadius;
 
-            sb.mesh.position.set(
-              nx,
-              Math.sin(elapsed * 2 + sb.phase) * 0.08,
-              nz,
-            );
-            sb.mesh.lookAt(nextX, sb.mesh.position.y, nextZ);
+              const dx = tx - sb.mesh.position.x;
+              const dz = tz - sb.mesh.position.z;
+              const distToPort = Math.hypot(dx, dz);
+
+              // 抵達目標島嶼外圍港口後，立刻切換前往下一座島嶼，維持高頻率島際往返
+              if (distToPort < 1.35) {
+                if (islands.length > 1) {
+                  let nextIdx = sb.targetIslandIdx;
+                  while (nextIdx === sb.targetIslandIdx) {
+                    nextIdx = Math.floor(Math.random() * islands.length);
+                  }
+                  sb.targetIslandIdx = nextIdx;
+                }
+                sb.portAngle = Math.random() * Math.PI * 2;
+              }
+
+              let desiredVx = (dx / (distToPort || 1)) * sb.speed;
+              let desiredVz = (dz / (distToPort || 1)) * sb.speed;
+
+              // 對每一座島嶼計算排斥避障力場，防止穿過島嶼
+              islands.forEach(function (isl) {
+                const ox = sb.mesh.position.x - isl.x;
+                const oz = sb.mesh.position.z - isl.z;
+                const d = Math.hypot(ox, oz);
+                const safeRadius = (isl.radius || 3.2) * 1.25 + 1.65;
+
+                if (d < safeRadius && d > 0.001) {
+                  const strength =
+                    Math.pow((safeRadius - d) / safeRadius, 1.4) *
+                    sb.speed *
+                    2.8;
+                  // 徑向推離 + 切線繞行引導，平滑沿著海岸弧線繞過
+                  desiredVx += (ox / d) * strength + (-oz / d) * strength * 0.7;
+                  desiredVz += (oz / d) * strength + (ox / d) * strength * 0.7;
+                }
+              });
+
+              // 帆船之間也保持禮讓距離
+              sailboats.forEach(function (other) {
+                if (other === sb) return;
+                const bx = sb.mesh.position.x - other.mesh.position.x;
+                const bz = sb.mesh.position.z - other.mesh.position.z;
+                const bd = Math.hypot(bx, bz);
+                if (bd < 1.3 && bd > 0.001) {
+                  desiredVx += (bx / bd) * 0.012;
+                  desiredVz += (bz / bd) * 0.012;
+                }
+              });
+
+              sb.vx += (desiredVx - sb.vx) * 0.065;
+              sb.vz += (desiredVz - sb.vz) * 0.065;
+              const curSpeed = Math.hypot(sb.vx, sb.vz);
+              if (curSpeed > sb.speed * 1.35) {
+                sb.vx = (sb.vx / curSpeed) * sb.speed * 1.35;
+                sb.vz = (sb.vz / curSpeed) * sb.speed * 1.35;
+              }
+            }
+
+            sb.mesh.position.x += sb.vx;
+            sb.mesh.position.z += sb.vz;
+            sb.mesh.position.y = Math.sin(elapsed * 2 + sb.phase) * 0.07;
+            sb.mesh.rotation.y = Math.atan2(sb.vx, sb.vz);
             sb.mesh.rotation.z = Math.sin(elapsed * 2.2 + sb.phase) * 0.08;
+          });
+
+          // 2. 更新天空海鷗群盤旋與振翅
+          seagulls.forEach(function (sg) {
+            const f = sg.flock;
+            const t = elapsed * f.speed + f.phase;
+            const fx = f.cx + Math.cos(t) * f.rx;
+            const fz = f.cz + Math.sin(t * 2) * (f.rz * 0.6);
+            const dt = f.speed >= 0 ? 0.04 : -0.04;
+            const nx = f.cx + Math.cos(t + dt) * f.rx;
+            const nz = f.cz + Math.sin((t + dt) * 2) * (f.rz * 0.6);
+
+            sg.mesh.position.set(
+              fx + sg.offsetX,
+              f.height +
+                sg.offsetY +
+                Math.sin(elapsed * 2 + sg.flapOffset) * 0.22,
+              fz + sg.offsetZ,
+            );
+            sg.mesh.rotation.y = Math.atan2(nx - fx, nz - fz);
+
+            const flap = Math.sin(elapsed * 7.5 + sg.flapOffset) * 0.55;
+            sg.leftWing.rotation.z = flap;
+            sg.rightWing.rotation.z = -flap;
+          });
+
+          // 3. 更新高空巡航客機
+          skyAirplanes.forEach(function (ap) {
+            const t = elapsed * ap.speed + ap.phase;
+            const px = Math.cos(t) * ap.rx;
+            const pz = Math.sin(t) * ap.rz;
+            const dt = ap.speed >= 0 ? 0.03 : -0.03;
+            const nx = Math.cos(t + dt) * ap.rx;
+            const nz = Math.sin(t + dt) * ap.rz;
+
+            ap.mesh.position.set(px, ap.alt, pz);
+            ap.mesh.rotation.y = Math.atan2(nx - px, nz - pz);
+            ap.mesh.rotation.z = ap.speed >= 0 ? -0.16 : 0.16;
           });
 
           dolphins.forEach(function (dp) {
