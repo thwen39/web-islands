@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>二元搜尋樹 (BST) 視覺化工具</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        .controls-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 20px;
+            width: 100%;
+            max-width: 800px;
+        }
+        .controls {
+            background: white;
+            padding: 15px 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        input[type="number"] {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            width: 80px;
+            font-size: 16px;
+        }
+        button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            color: white;
+            transition: background 0.2s, transform 0.1s;
+        }
+        button:active { transform: scale(0.95); }
+        button:disabled {
+            background: #95a5a6 !important;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        /* 基礎操作按鈕 */
+        #btn-insert { background-color: #27ae60; }
+        #btn-insert:hover { background-color: #219150; }
+        #btn-search { background-color: #2980b9; }
+        #btn-search:hover { background-color: #2471a3; }
+        #btn-delete { background-color: #c0392b; }
+        #btn-delete:hover { background-color: #a93226; }
+
+        /* 走訪按鈕 */
+        #btn-pre { background-color: #8e44ad; }
+        #btn-pre:hover { background-color: #732d91; }
+        #btn-in { background-color: #d35400; }
+        #btn-in:hover { background-color: #a04000; }
+        #btn-post { background-color: #16a085; }
+        #btn-post:hover { background-color: #117a65; }
+        
+        .status-board {
+            text-align: center;
+            margin-bottom: 15px;
+            width: 100%;
+            max-width: 1000px;
+        }
+        .status {
+            font-size: 18px;
+            font-weight: bold;
+            color: #34495e;
+            min-height: 26px;
+            margin-bottom: 5px;
+        }
+        .result-box {
+            font-size: 18px;
+            font-weight: bold;
+            color: #8e44ad;
+            min-height: 26px;
+            background: #e8daef;
+            padding: 5px 15px;
+            border-radius: 20px;
+            display: inline-block;
+            border: 2px dashed #8e44ad;
+        }
+
+        #tree-container {
+            position: relative;
+            width: 100%;
+            max-width: 1000px;
+            height: 600px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        
+        line {
+            stroke: #7f8c8d;
+            stroke-width: 2;
+        }
+
+        .node {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            background-color: #3498db;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            font-size: 16px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            transition: top 0.5s ease-in-out, left 0.5s ease-in-out, background-color 0.3s;
+            transform: translate(-50%, -50%);
+            z-index: 10;
+        }
+
+        /* 動畫狀態顏色 */
+        .node.visiting { background-color: #f1c40f; box-shadow: 0 0 10px #f1c40f; } /* 經過/尋找中：黃色 */
+        .node.found { background-color: #2ecc71; box-shadow: 0 0 15px #2ecc71; }    /* 找到/輸出：綠色 */
+        .node.deleting { background-color: #e74c3c; box-shadow: 0 0 15px #e74c3c;} /* 刪除/錯誤：紅色 */
+        
+    </style>
+</head>
+<body>
+
+    <h1>二元搜尋樹 (BST) 視覺化</h1>
+    
+    <div class="controls-group">
+        <div class="controls">
+            <input type="number" id="node-value" placeholder="輸入數字" />
+            <button id="btn-insert" onclick="handleInsert()">新增 (Insert)</button>
+            <button id="btn-search" onclick="handleSearch()">搜尋 (Search)</button>
+            <button id="btn-delete" onclick="handleDelete()">刪除 (Delete)</button>
+        </div>
+        <div class="controls">
+            <button id="btn-pre" onclick="handleTraverse('pre')">前序走訪 (Pre-order)</button>
+            <button id="btn-in" onclick="handleTraverse('in')">中序走訪 (In-order)</button>
+            <button id="btn-post" onclick="handleTraverse('post')">後序走訪 (Post-order)</button>
+        </div>
+    </div>
+    
+    <div class="status-board">
+        <div class="status" id="status-msg">請輸入數字新增節點，或選擇走訪模式。</div>
+        <div class="result-box">走訪結果：<span id="traversal-output">無</span></div>
+    </div>
+
+    <div id="tree-container">
+        <svg id="edges"></svg>
+    </div>
+
+    <script>
+        class Node {
+            constructor(value) {
+                this.value = value;
+                this.left = null;
+                this.right = null;
+                this.x = 0;
+                this.y = 0;
+                
+                this.el = document.createElement('div');
+                this.el.className = 'node';
+                this.el.innerText = value;
+            }
+        }
+
+        let root = null;
+        const container = document.getElementById('tree-container');
+        const svg = document.getElementById('edges');
+        const statusMsg = document.getElementById('status-msg');
+        const inputField = document.getElementById('node-value');
+        const traversalOutput = document.getElementById('traversal-output');
+        const delayMs = 600;
+
+        const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+        function setStatus(msg) {
+            statusMsg.innerText = msg;
+        }
+
+        function toggleButtons(disabled) {
+            const buttons = document.querySelectorAll('button');
+            buttons.forEach(btn => btn.disabled = disabled);
+        }
+
+        function getInputValue() {
+            const val = parseInt(inputField.value);
+            if (isNaN(val)) {
+                alert("請輸入有效的數字！");
+                return null;
+            }
+            return val;
+        }
+
+        // === 基礎操作 ===
+        async function handleInsert() {
+            const val = getInputValue();
+            if (val === null) return;
+            toggleButtons(true);
+            traversalOutput.innerText = "無";
+            
+            if (!root) {
+                setStatus(`樹是空的，新增根節點 ${val}`);
+                root = new Node(val);
+                container.appendChild(root.el);
+                updateTreeLayout();
+                await sleep(delayMs);
+                root.el.classList.add('found');
+                await sleep(delayMs);
+                root.el.classList.remove('found');
+            } else {
+                await insertNode(root, val);
+            }
+            
+            inputField.value = '';
+            setStatus('新增完成。');
+            toggleButtons(false);
+        }
+
+        async function insertNode(current, val) {
+            current.el.classList.add('visiting');
+            setStatus(`比較 ${val} 與 ${current.value}`);
+            await sleep(delayMs);
+            current.el.classList.remove('visiting');
+
+            if (val === current.value) {
+                setStatus(`節點 ${val} 已存在！`);
+                current.el.classList.add('deleting'); 
+                await sleep(delayMs);
+                current.el.classList.remove('deleting');
+                return;
+            }
+
+            if (val < current.value) {
+                if (current.left === null) {
+                    setStatus(`${val} 小於 ${current.value}，放在左子節點`);
+                    current.left = new Node(val);
+                    container.appendChild(current.left.el);
+                    current.left.el.style.left = current.el.style.left;
+                    current.left.el.style.top = current.el.style.top;
+                    updateTreeLayout();
+                    await sleep(delayMs);
+                    current.left.el.classList.add('found');
+                    await sleep(delayMs);
+                    current.left.el.classList.remove('found');
+                } else {
+                    setStatus(`${val} 小於 ${current.value}，往左尋找`);
+                    await insertNode(current.left, val);
+                }
+            } else {
+                if (current.right === null) {
+                    setStatus(`${val} 大於 ${current.value}，放在右子節點`);
+                    current.right = new Node(val);
+                    container.appendChild(current.right.el);
+                    current.right.el.style.left = current.el.style.left;
+                    current.right.el.style.top = current.el.style.top;
+                    updateTreeLayout();
+                    await sleep(delayMs);
+                    current.right.el.classList.add('found');
+                    await sleep(delayMs);
+                    current.right.el.classList.remove('found');
+                } else {
+                    setStatus(`${val} 大於 ${current.value}，往右尋找`);
+                    await insertNode(current.right, val);
+                }
+            }
+        }
+
+        async function handleSearch() {
+            const val = getInputValue();
+            if (val === null) return;
+            if (!root) { setStatus("樹是空的！"); return; }
+            toggleButtons(true);
+            traversalOutput.innerText = "無";
+            await searchNode(root, val);
+            toggleButtons(false);
+        }
+
+        async function searchNode(current, val) {
+            if (!current) {
+                setStatus(`找不到節點 ${val}！`);
+                return false;
+            }
+            current.el.classList.add('visiting');
+            setStatus(`比對節點 ${current.value}...`);
+            await sleep(delayMs);
+
+            if (val === current.value) {
+                setStatus(`找到了！節點 ${val}`);
+                current.el.classList.remove('visiting');
+                current.el.classList.add('found');
+                await sleep(delayMs * 2);
+                current.el.classList.remove('found');
+                return true;
+            }
+            
+            current.el.classList.remove('visiting');
+            if (val < current.value) {
+                setStatus(`${val} 小於 ${current.value}，往左`);
+                return await searchNode(current.left, val);
+            } else {
+                setStatus(`${val} 大於 ${current.value}，往右`);
+                return await searchNode(current.right, val);
+            }
+        }
+
+        async function handleDelete() {
+            const val = getInputValue();
+            if (val === null) return;
+            if (!root) { setStatus("樹是空的！"); return; }
+            toggleButtons(true);
+            traversalOutput.innerText = "無";
+            root = await deleteNode(root, val);
+            updateTreeLayout();
+            setStatus(`刪除操作結束。`);
+            toggleButtons(false);
+        }
+
+        async function deleteNode(current, val) {
+            if (!current) {
+                setStatus(`找不到節點 ${val}！`);
+                return null;
+            }
+            current.el.classList.add('visiting');
+            await sleep(delayMs);
+            current.el.classList.remove('visiting');
+
+            if (val < current.value) {
+                current.left = await deleteNode(current.left, val);
+            } else if (val > current.value) {
+                current.right = await deleteNode(current.right, val);
+            } else {
+                current.el.classList.add('deleting');
+                setStatus(`準備刪除節點 ${current.value}`);
+                await sleep(delayMs);
+
+                if (!current.left && !current.right) {
+                    container.removeChild(current.el);
+                    return null;
+                }
+                if (!current.left) {
+                    container.removeChild(current.el);
+                    return current.right;
+                }
+                if (!current.right) {
+                    container.removeChild(current.el);
+                    return current.left;
+                }
+
+                setStatus(`節點有兩子節點，尋找右子樹最小值替換`);
+                let minNode = current.right;
+                while (minNode.left) {
+                    minNode.el.classList.add('visiting');
+                    await sleep(delayMs / 2);
+                    minNode.el.classList.remove('visiting');
+                    minNode = minNode.left;
+                }
+                
+                minNode.el.classList.add('found');
+                setStatus(`找到替代節點 ${minNode.value}`);
+                await sleep(delayMs);
+                
+                current.value = minNode.value;
+                current.el.innerText = minNode.value;
+                current.el.classList.remove('deleting');
+                minNode.el.classList.remove('found');
+                
+                current.right = await deleteNode(current.right, minNode.value);
+            }
+            return current;
+        }
+
+        // === 新增：動態走訪演算法 ===
+        async function handleTraverse(type) {
+            if (!root) {
+                setStatus("樹是空的，無法走訪！");
+                return;
+            }
+            toggleButtons(true);
+            
+            let typeName = "";
+            if(type === 'pre') typeName = "前序 (Pre-order)";
+            if(type === 'in') typeName = "中序 (In-order)";
+            if(type === 'post') typeName = "後序 (Post-order)";
+            
+            setStatus(`開始 ${typeName} 走訪...`);
+            traversalOutput.innerText = "";
+            
+            let resultArr = [];
+            await executeTraversal(root, type, resultArr);
+            
+            setStatus(`${typeName} 走訪完成！`);
+            toggleButtons(false);
+        }
+
+        // 遞迴走訪核心邏輯
+        async function executeTraversal(node, type, resultArr) {
+            if (!node) return;
+
+            // 1. 進入節點 (遞迴呼叫開始)
+            node.el.classList.add('visiting');
+            setStatus(`↓ 進入節點 ${node.value}`);
+            await sleep(delayMs * 0.8);
+
+            // 前序：第一次遇到節點就輸出
+            if (type === 'pre') {
+                await processNodeForTraversal(node, resultArr);
+            }
+
+            // 準備進入左子樹：先移除當前節點的高亮，代表指標往下移動
+            if (node.left) {
+                node.el.classList.remove('visiting');
+                await executeTraversal(node.left, type, resultArr);
+                
+                // 從左子樹回溯歸來
+                node.el.classList.add('visiting');
+                setStatus(`↑ 回到節點 ${node.value} (從左子樹)`);
+                await sleep(delayMs * 0.8);
+            }
+
+            // 中序：左子樹走訪完畢後輸出
+            if (type === 'in') {
+                await processNodeForTraversal(node, resultArr);
+            }
+
+            // 準備進入右子樹
+            if (node.right) {
+                node.el.classList.remove('visiting');
+                await executeTraversal(node.right, type, resultArr);
+                
+                // 從右子樹回溯歸來
+                node.el.classList.add('visiting');
+                setStatus(`↑ 回到節點 ${node.value} (從右子樹)`);
+                await sleep(delayMs * 0.8);
+            }
+
+            // 後序：左右子樹都走訪完畢後才輸出
+            if (type === 'post') {
+                await processNodeForTraversal(node, resultArr);
+            }
+
+            // 離開節點 (遞迴呼叫結束)
+            node.el.classList.remove('visiting');
+            setStatus(`↑ 離開節點 ${node.value}`);
+            await sleep(delayMs * 0.5);
+        }
+
+        // 走訪時輸出並記錄結果
+        async function processNodeForTraversal(node, resultArr) {
+            node.el.classList.remove('visiting');
+            node.el.classList.add('found'); // 變綠色表示已輸出
+            
+            resultArr.push(node.value);
+            traversalOutput.innerText = resultArr.join(' ➔ ');
+            setStatus(`★ 輸出節點 ${node.value}`);
+            
+            await sleep(delayMs * 1.2); // 停頓久一點讓學生看清楚輸出
+            
+            node.el.classList.remove('found');
+            node.el.classList.add('visiting'); // 恢復原本的指標狀態
+        }
+
+        // === 視覺化與排版計算 ===
+        function updateTreeLayout() {
+            if (!root) return;
+            const containerWidth = container.offsetWidth;
+            calculatePositions(root, containerWidth / 2, 50, containerWidth / 4);
+            applyPositions(root);
+        }
+
+        function calculatePositions(node, x, y, offset) {
+            if (!node) return;
+            node.x = x;
+            node.y = y;
+            calculatePositions(node.left, x - offset, y + 70, offset / 2);
+            calculatePositions(node.right, x + offset, y + 70, offset / 2);
+        }
+
+        function applyPositions(node) {
+            if (!node) return;
+            node.el.style.left = node.x + 'px';
+            node.el.style.top = node.y + 'px';
+            applyPositions(node.left);
+            applyPositions(node.right);
+        }
+
+        function drawLines() {
+            svg.innerHTML = ''; 
+            if (root) drawNodeLines(root);
+            requestAnimationFrame(drawLines);
+        }
+
+        function drawNodeLines(node) {
+            if (!node) return;
+            const rectParent = node.el.getBoundingClientRect();
+            const containerRect = container.getBoundingClientRect();
+            const x1 = rectParent.left - containerRect.left + rectParent.width / 2;
+            const y1 = rectParent.top - containerRect.top + rectParent.height / 2;
+
+            if (node.left) {
+                const rectChild = node.left.el.getBoundingClientRect();
+                const x2 = rectChild.left - containerRect.left + rectChild.width / 2;
+                const y2 = rectChild.top - containerRect.top + rectChild.height / 2;
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+                line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+                svg.appendChild(line);
+                drawNodeLines(node.left);
+            }
+
+            if (node.right) {
+                const rectChild = node.right.el.getBoundingClientRect();
+                const x2 = rectChild.left - containerRect.left + rectChild.width / 2;
+                const y2 = rectChild.top - containerRect.top + rectChild.height / 2;
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+                line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+                svg.appendChild(line);
+                drawNodeLines(node.right);
+            }
+        }
+
+        requestAnimationFrame(drawLines);
+        window.addEventListener('resize', updateTreeLayout);
+
+    </script>
+</body>
+</html>

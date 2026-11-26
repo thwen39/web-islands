@@ -1,0 +1,2716 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>3D 台灣十六張麻將</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@600;700;900&family=Noto+Sans+TC:wght@400;500;700&display=swap');
+
+  :root {
+    --felt-light: #16704c;
+    --felt-dark: #093524;
+    --wood-light: #6d3219;
+    --wood-dark: #361509;
+    --gold: #f5c96b;
+    --gold-dark: #b98223;
+    --tile-w: 44px;
+    --tile-h: 62px;
+    --tile-sm-w: 30px;
+    --tile-sm-h: 42px;
+    --tile-xs-w: 24px;
+    --tile-xs-h: 34px;
+    --compass-size: 156px;
+    --discard-gap: 12px;
+  }
+
+  * {
+    box-sizing: border-box;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    font-family: 'Noto Sans TC', system-ui, sans-serif;
+    background: radial-gradient(circle at 50% 35%, #1d2824 0%, #0b110f 70%, #050807 100%);
+    color: #f8f5ec;
+  }
+
+  /* 3D 舞台與透視牌桌 */
+  .stage-wrapper {
+    position: relative;
+    width: 100%;
+    height: calc(100vh - 52px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    perspective: 1150px;
+    overflow: hidden;
+  }
+
+  .mahjong-table-3d {
+    position: relative;
+    width: min(94vw, 940px);
+    height: min(68vh, 570px);
+    transform: rotateX(22deg) translateY(-28px);
+    transform-style: preserve-3d;
+    border-radius: 28px;
+    background:
+      radial-gradient(ellipse at 50% 45%, rgba(36, 150, 102, 0.45) 0%, rgba(12, 68, 46, 0.2) 55%, rgba(4, 24, 16, 0.65) 100%),
+      repeating-linear-gradient(45deg, rgba(255,255,255,0.015) 0px, rgba(255,255,255,0.015) 2px, transparent 2px, transparent 6px),
+      linear-gradient(160deg, var(--felt-light) 0%, var(--felt-dark) 100%);
+    border: 14px solid var(--wood-light);
+    box-shadow:
+      inset 0 0 40px rgba(0, 0, 0, 0.72),
+      inset 0 0 0 3px rgba(245, 201, 107, 0.35),
+      0 18px 0 var(--wood-dark),
+      0 26px 45px rgba(0, 0, 0, 0.85),
+      0 0 90px rgba(22, 112, 76, 0.25);
+    transition: transform 0.3s ease;
+  }
+
+  /* 牌桌角落金色包角裝飾 */
+  .mahjong-table-3d::before {
+    content: '';
+    position: absolute;
+    inset: -14px;
+    border-radius: 28px;
+    border: 2px solid rgba(245, 201, 107, 0.28);
+    pointer-events: none;
+  }
+
+  /* 中央立體羅盤資訊區 */
+  .center-compass {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) translateZ(8px);
+    width: var(--compass-size);
+    height: var(--compass-size);
+    border-radius: 22px;
+    background: radial-gradient(circle at 35% 30%, #2a1810, #120905);
+    border: 3px solid var(--gold-dark);
+    box-shadow:
+      0 10px 22px rgba(0, 0, 0, 0.75),
+      inset 0 0 18px rgba(245, 201, 107, 0.18),
+      0 0 0 2px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+  }
+
+  .compass-wind-badge {
+    position: absolute;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Noto Serif TC', serif;
+    font-weight: 900;
+    font-size: 14px;
+    background: rgba(255, 255, 255, 0.08);
+    color: #9ca3af;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    transition: all 0.25s ease;
+  }
+
+  .compass-wind-badge.active-turn {
+    background: linear-gradient(135deg, #fde68a, #d97706);
+    color: #2c1205;
+    border-color: #fff7d6;
+    box-shadow: 0 0 16px rgba(251, 191, 36, 0.95), 0 0 4px #fff;
+    transform: scale(1.16);
+  }
+
+  .compass-wind-badge.dealer-mark::after {
+    content: '莊';
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    font-size: 9px;
+    background: #dc2626;
+    color: #fff;
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #fecaca;
+    font-family: 'Noto Sans TC', sans-serif;
+  }
+
+  .compass-bottom { bottom: 6px; left: 50%; transform: translateX(-50%); }
+  .compass-bottom.active-turn { transform: translateX(-50%) scale(1.16); }
+  .compass-top { top: 6px; left: 50%; transform: translateX(-50%); }
+  .compass-top.active-turn { transform: translateX(-50%) scale(1.16); }
+  .compass-right { right: 6px; top: 50%; transform: translateY(-50%); }
+  .compass-right.active-turn { transform: translateY(-50%) scale(1.16); }
+  .compass-left { left: 6px; top: 50%; transform: translateY(-50%); }
+  .compass-left.active-turn { transform: translateY(-50%) scale(1.16); }
+
+  /* 3D 麻將牌樣式 */
+  .mj-tile {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    background: linear-gradient(160deg, #fffefb 0%, #f5efe0 65%, #e6dcc6 100%);
+    border: 1px solid #d7cbb2;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.95),
+      inset 0 -2px 3px rgba(175, 155, 120, 0.35),
+      0 3px 0 #cfc3a8,
+      0 6px 0 #0d7448,
+      0 8px 10px rgba(0, 0, 0, 0.48);
+    transition: transform 0.16s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.16s ease, filter 0.16s ease;
+    flex-shrink: 0;
+  }
+
+  .mj-tile svg {
+    width: 90%;
+    height: 90%;
+    display: block;
+    pointer-events: none;
+  }
+
+  /* 玩家手牌立體大牌 */
+  .mj-tile-hand {
+    width: var(--tile-w);
+    height: var(--tile-h);
+    border-radius: 7px;
+    cursor: pointer;
+    box-shadow:
+      inset 0 2px 1px rgba(255, 255, 255, 0.95),
+      inset 0 -2px 3px rgba(165, 145, 110, 0.35),
+      0 4px 0 #cfc3a8,
+      0 8px 0 #0c784a,
+      0 12px 16px rgba(0, 0, 0, 0.6);
+  }
+
+  .mj-tile-hand:hover {
+    transform: translateY(-13px);
+    box-shadow:
+      inset 0 2px 1px rgba(255, 255, 255, 0.98),
+      0 4px 0 #cfc3a8,
+      0 8px 0 #0f8b56,
+      0 20px 22px rgba(0, 0, 0, 0.65);
+  }
+
+  .mj-tile-hand.selected {
+    transform: translateY(-22px);
+    border-color: #fbbf24;
+    box-shadow:
+      0 0 0 2px #fde047,
+      0 0 18px rgba(250, 204, 21, 0.85),
+      0 4px 0 #cfc3a8,
+      0 8px 0 #0f8b56,
+      0 24px 24px rgba(0, 0, 0, 0.72);
+  }
+
+  .mj-tile-hand.drawn-gap {
+    margin-left: 14px;
+    animation: tileDrawPop 0.28s ease-out;
+  }
+
+  @keyframes tileDrawPop {
+    0% { transform: translateY(-28px) scale(1.06); opacity: 0.5; }
+    100% { transform: translateY(0) scale(1); opacity: 1; }
+  }
+
+  /* 桌面棄牌 / 吃碰明牌 */
+  .mj-tile-sm {
+    width: var(--tile-sm-w);
+    height: var(--tile-sm-h);
+    border-radius: 5px;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.9),
+      0 2px 0 #cbbda0,
+      0 4px 0 #0b6940,
+      0 5px 7px rgba(0, 0, 0, 0.45);
+  }
+
+  .mj-tile-xs {
+    width: var(--tile-xs-w);
+    height: var(--tile-xs-h);
+    border-radius: 4px;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.9),
+      0 2px 0 #cbbda0,
+      0 3px 0 #0b6940,
+      0 4px 5px rgba(0, 0, 0, 0.42);
+  }
+
+  /* 牌背 (AI手牌 / 暗槓) */
+  .mj-tile-back {
+    background: linear-gradient(155deg, #16a364 0%, #0d7547 60%, #085131 100%);
+    border: 1px solid #34d399;
+    box-shadow:
+      inset 0 1px 1px rgba(255, 255, 255, 0.35),
+      0 2px 0 #064026,
+      0 4px 0 #d8ccb3,
+      0 6px 8px rgba(0, 0, 0, 0.5);
+  }
+
+  .mj-tile-back::after {
+    content: '';
+    width: 65%;
+    height: 70%;
+    border-radius: 3px;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+  }
+  /* 四家海底棄牌區（以中央羅盤為核心呈「口」字型對稱圍繞，遠離左右手牌） */
+  .discard-zone {
+    position: absolute;
+    display: grid;
+    grid-template-columns: repeat(8, var(--tile-xs-w));
+    gap: 2px;
+    padding: 3px;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.16);
+    z-index: 14;
+  }
+
+  .discard-bottom {
+    top: calc(50% + var(--compass-size) / 2 + var(--discard-gap));
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .discard-top {
+    bottom: calc(50% + var(--compass-size) / 2 + var(--discard-gap));
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .discard-right {
+    left: calc(50% + var(--compass-size) / 2 + var(--discard-gap));
+    top: 50%;
+    transform: translateY(-50%);
+    grid-template-columns: repeat(6, var(--tile-xs-w));
+  }
+
+  .discard-left {
+    right: calc(50% + var(--compass-size) / 2 + var(--discard-gap));
+    top: 50%;
+    transform: translateY(-50%);
+    grid-template-columns: repeat(6, var(--tile-xs-w));
+  }
+
+  /* AI 牌背與明牌列（左右兩家採手牌靠邊、副露內縮並排，避免延伸至上下角落花牌區） */
+  .ai-top-area {
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    z-index: 12;
+  }
+
+  .ai-left-area {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    z-index: 12;
+  }
+
+  .ai-right-area {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: row-reverse;
+    align-items: center;
+    gap: 6px;
+    z-index: 12;
+  }
+
+  /* 左右 AI 緊湊牌背與副露小牌尺寸 */
+  .ai-side-back {
+    width: 20px;
+    height: 14px;
+    border-radius: 3px;
+  }
+
+  .ai-side-meld-tile {
+    width: 20px;
+    height: 28px;
+    border-radius: 4px;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.9),
+      0 2px 0 #cbbda0,
+      0 3px 0 #0b6940,
+      0 4px 5px rgba(0, 0, 0, 0.42);
+  }
+
+  /* 3D 牌桌四家專屬花牌展示區 (位於各家右手側角落，避免與牌河及副露重疊) */
+  .flower-zone {
+    position: absolute;
+    z-index: 18;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 4px 6px;
+    border-radius: 10px;
+    background: rgba(6, 26, 17, 0.58);
+    border: 1px solid rgba(245, 201, 107, 0.32);
+    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.45), 0 4px 10px rgba(0, 0, 0, 0.35);
+    min-width: 54px;
+    max-width: 180px;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+  }
+
+  .flower-zone.empty-flower {
+    opacity: 0.42;
+    border-style: dashed;
+  }
+
+  .flower-zone-label {
+    font-size: 10px;
+    font-weight: 700;
+    color: rgba(253, 230, 138, 0.85);
+    letter-spacing: 0.04em;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+    line-height: 1.1;
+  }
+
+  .flower-tiles-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    align-items: center;
+  }
+
+  /* 下方玩家：右下角；右方下家：右上角；上方對家：左上角；左方上家：左下角 */
+  .flower-zone-0 { bottom: 10px; right: 14px; align-items: flex-end; }
+  .flower-zone-1 { top: 10px; right: 14px; align-items: flex-end; }
+  .flower-zone-2 { top: 10px; left: 14px; align-items: flex-start; }
+  .flower-zone-3 { bottom: 10px; left: 14px; align-items: flex-start; }
+
+  .mj-tile-flower {
+    width: var(--tile-sm-w);
+    height: var(--tile-sm-h);
+    border-radius: 5px;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.95),
+      0 2px 0 #cbbda0,
+      0 4px 0 #0b6940,
+      0 6px 8px rgba(0, 0, 0, 0.5);
+    animation: flowerPopIn 0.36s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  /* 正花金色光暈與「正」字角標 */
+  .mj-tile-flower.flower-zheng {
+    border-color: #fbbf24;
+    box-shadow:
+      0 0 0 1.5px #fde047,
+      0 0 12px rgba(251, 191, 36, 0.85),
+      0 2px 0 #cbbda0,
+      0 4px 0 #0b6940,
+      0 6px 10px rgba(0, 0, 0, 0.55);
+  }
+
+  .mj-tile-flower.flower-zheng::after {
+    content: '正';
+    position: absolute;
+    top: -6px;
+    left: -6px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #f59e0b, #b45309);
+    color: #fffbeb;
+    font-size: 9px;
+    font-weight: 900;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #fef08a;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+    z-index: 5;
+  }
+
+  @keyframes flowerPopIn {
+    0% { transform: translateY(-14px) scale(0.75); opacity: 0; }
+    100% { transform: translateY(0) scale(1); opacity: 1; }
+  }
+
+  /* 玩家資訊牌 (固定於視窗四周，清晰可讀) */
+  .player-hud {
+    position: fixed;
+    z-index: 30;
+    background: rgba(14, 24, 20, 0.86);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(245, 201, 107, 0.35);
+    border-radius: 14px;
+    padding: 6px 10px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.55);
+    transition: border-color 0.25s, box-shadow 0.25s;
+  }
+
+  .player-hud.active-hud {
+    border-color: #fbbf24;
+    box-shadow: 0 0 18px rgba(251, 191, 36, 0.45), 0 8px 20px rgba(0, 0, 0, 0.6);
+  }
+
+  /* 玩家底部手牌控制列 */
+  .player-dock {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 40;
+    padding: 8px 12px 14px;
+    background: linear-gradient(to top, rgba(6, 12, 9, 0.96) 0%, rgba(6, 12, 9, 0.72) 72%, transparent 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* 發光互動操作列 (吃 / 碰 / 槓 / 胡 / 過) */
+  .action-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 8px 16px;
+    border-radius: 999px;
+    background: rgba(12, 22, 18, 0.92);
+    border: 2px solid rgba(250, 204, 21, 0.75);
+    box-shadow: 0 0 30px rgba(250, 204, 21, 0.35), 0 10px 25px rgba(0, 0, 0, 0.75);
+    animation: actionSlideUp 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  @keyframes actionSlideUp {
+    0% { transform: translateY(18px) scale(0.92); opacity: 0; }
+    100% { transform: translateY(0) scale(1); opacity: 1; }
+  }
+
+  .act-btn {
+    font-family: 'Noto Serif TC', serif;
+    font-weight: 900;
+    font-size: 18px;
+    padding: 7px 20px;
+    border-radius: 999px;
+    border: 2px solid rgba(255, 255, 255, 0.55);
+    cursor: pointer;
+    color: #fff;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+    transition: transform 0.14s ease, filter 0.14s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+  }
+
+  .act-btn:hover { transform: translateY(-2px) scale(1.06); filter: brightness(1.12); }
+  .act-btn:active { transform: translateY(1px) scale(0.96); }
+
+  .act-hu { background: linear-gradient(135deg, #ef4444, #991b1b); border-color: #fde047; box-shadow: 0 0 20px rgba(239, 68, 68, 0.8); }
+  .act-kong { background: linear-gradient(135deg, #a855f7, #6b21a8); }
+  .act-pong { background: linear-gradient(135deg, #f59e0b, #b45309); }
+  .act-chow { background: linear-gradient(135deg, #10b981, #047857); }
+  .act-pass { background: linear-gradient(135deg, #4b5563, #1f2937); font-family: 'Noto Sans TC', sans-serif; font-size: 15px; }
+
+  /* 中央 3D 漢字特效橫幅 */
+  .fx-banner-overlay {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 80;
+  }
+
+  .fx-banner {
+    font-family: 'Noto Serif TC', serif;
+    font-weight: 900;
+    font-size: clamp(54px, 11vw, 108px);
+    letter-spacing: 0.12em;
+    padding: 10px 44px;
+    border-radius: 24px;
+    background: radial-gradient(circle, rgba(180, 28, 28, 0.92) 0%, rgba(92, 12, 12, 0.85) 70%, transparent 100%);
+    color: #fef08a;
+    text-shadow:
+      0 3px 0 #92400e,
+      0 7px 0 #451a03,
+      0 0 32px rgba(250, 204, 21, 0.95),
+      0 14px 28px rgba(0, 0, 0, 0.85);
+    animation: fxPop3D 1.15s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
+  }
+
+  .fx-banner.fx-green {
+    background: radial-gradient(circle, rgba(16, 125, 78, 0.92) 0%, rgba(6, 60, 36, 0.82) 72%, transparent 100%);
+  }
+
+  .fx-banner.fx-purple {
+    background: radial-gradient(circle, rgba(126, 34, 206, 0.92) 0%, rgba(59, 7, 100, 0.82) 72%, transparent 100%);
+  }
+
+  .fx-banner.fx-gold {
+    background: radial-gradient(circle, rgba(217, 119, 6, 0.94) 0%, rgba(120, 53, 15, 0.84) 72%, transparent 100%);
+  }
+
+  @keyframes fxPop3D {
+    0% { transform: perspective(600px) scale(0.2) rotateX(45deg); opacity: 0; }
+    25% { transform: perspective(600px) scale(1.16) rotateX(0deg); opacity: 1; }
+    65% { transform: perspective(600px) scale(1.0) rotateX(0deg); opacity: 1; }
+    100% { transform: perspective(600px) scale(1.25) translateY(-18px); opacity: 0; }
+  }
+
+  /* 響應式微調 */
+  @media (max-width: 900px) {
+    :root {
+      --tile-w: 36px;
+      --tile-h: 51px;
+      --tile-sm-w: 25px;
+      --tile-sm-h: 35px;
+      --tile-xs-w: 20px;
+      --tile-xs-h: 28px;
+      --compass-size: 126px;
+      --discard-gap: 8px;
+    }
+    .mahjong-table-3d {
+      width: 96vw;
+      height: 58vh;
+      transform: rotateX(16deg) translateY(-34px);
+      border-width: 10px;
+    }
+    .ai-left-area { left: 6px; gap: 4px; }
+    .ai-right-area { right: 6px; gap: 4px; }
+    .ai-side-back { width: 16px; height: 11px; }
+    .ai-side-meld-tile { width: 16px; height: 22px; }
+  }
+
+  @media (max-width: 600px) {
+    :root {
+      --tile-w: 28px;
+      --tile-h: 41px;
+      --tile-sm-w: 21px;
+      --tile-sm-h: 30px;
+      --tile-xs-w: 16px;
+      --tile-xs-h: 23px;
+      --compass-size: 102px;
+      --discard-gap: 6px;
+    }
+    .mahjong-table-3d {
+      height: 52vh;
+      transform: rotateX(12deg) translateY(-38px);
+      border-width: 8px;
+    }
+    .discard-left,
+    .discard-right {
+      grid-template-columns: repeat(5, var(--tile-xs-w));
+    }
+    .ai-left-area { left: 4px; gap: 3px; }
+    .ai-right-area { right: 4px; gap: 3px; }
+    .ai-side-back { width: 13px; height: 9px; }
+    .ai-side-meld-tile { width: 13px; height: 18px; }
+    .mj-tile-hand.drawn-gap {
+      margin-left: 7px;
+    }
+    .flower-zone {
+      padding: 3px 4px;
+      max-width: 126px;
+    }
+    .flower-zone-0 { bottom: 6px; right: 6px; }
+    .flower-zone-1 { top: 6px; right: 6px; }
+    .flower-zone-2 { top: 6px; left: 6px; }
+    .flower-zone-3 { bottom: 6px; left: 6px; }
+  }
+
+  /* 自訂捲軸 */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
+  ::-webkit-scrollbar-thumb { background: rgba(245, 201, 107, 0.45); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+  <!-- 頂部控制資訊列 -->
+  <header class="h-[52px] px-3 sm:px-5 flex items-center justify-between bg-[#09120e]/95 border-b border-amber-500/25 shadow-lg relative z-50">
+    <div class="flex items-center gap-2 sm:gap-3">
+      <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-800 border border-amber-300/60 flex items-center justify-center font-serif font-black text-amber-200 shadow">
+        發
+      </div>
+      <div>
+        <h1 class="text-sm sm:text-base font-bold tracking-wide text-amber-200 leading-tight" style="font-family:'Noto Serif TC',serif;">
+          3D 台灣十六張麻將
+        </h1>
+        <div id="topStakesLabel" class="text-[11px] text-emerald-300/90 leading-tight">100底 / 50台</div>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-1.5 sm:gap-2">
+      <button id="btnSound" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-emerald-900/70 hover:bg-emerald-800 border border-emerald-500/40 text-emerald-100 transition cursor-pointer" title="切換音效">
+        🔊 音效
+      </button>
+      <button id="btnVoice" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-emerald-900/70 hover:bg-emerald-800 border border-emerald-500/40 text-emerald-100 transition cursor-pointer" title="切換語音播報">
+        🗣️ 語音
+      </button>
+      <button id="btnSettings" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-amber-900/50 hover:bg-amber-800/70 border border-amber-400/40 text-amber-100 transition cursor-pointer">
+        ⚙️ 底台
+      </button>
+      <button id="btnRules" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800/80 hover:bg-slate-700 border border-slate-500/40 text-slate-100 transition cursor-pointer">
+        📖 規則
+      </button>
+      <button id="btnRestart" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-rose-900/70 hover:bg-rose-800 border border-rose-400/40 text-rose-100 transition cursor-pointer">
+        🔄 重開
+      </button>
+    </div>
+  </header>
+
+  <!-- 四家資訊 HUD -->
+  <!-- 對家 (Seat 2 - 上方) -->
+  <div id="hud-2" class="player-hud top-[60px] left-1/2 -translate-x-1/2 flex items-center gap-2.5 min-w-[190px]"></div>
+  <!-- 上家 (Seat 3 - 左側) -->
+  <div id="hud-3" class="player-hud top-[42%] -translate-y-1/2 left-2 sm:left-4 flex flex-col gap-1 min-w-[116px] sm:min-w-[138px]"></div>
+  <!-- 下家 (Seat 1 - 右側) -->
+  <div id="hud-1" class="player-hud top-[42%] -translate-y-1/2 right-2 sm:right-4 flex flex-col gap-1 min-w-[116px] sm:min-w-[138px]"></div>
+
+  <!-- 3D 透視牌桌舞台 -->
+  <main class="stage-wrapper">
+    <div class="mahjong-table-3d" id="mahjongTable">
+      <!-- AI 對家牌背與明牌 -->
+      <div class="ai-top-area" id="ai-area-2"></div>
+      <!-- AI 左家牌背與明牌 -->
+      <div class="ai-left-area" id="ai-area-3"></div>
+      <!-- AI 右家牌背與明牌 -->
+      <div class="ai-right-area" id="ai-area-1"></div>
+
+      <!-- 四家海底棄牌區 -->
+      <div class="discard-zone discard-top" id="discards-2"></div>
+      <div class="discard-zone discard-left" id="discards-3"></div>
+      <div class="discard-zone discard-right" id="discards-1"></div>
+      <div class="discard-zone discard-bottom" id="discards-0"></div>
+
+      <!-- 四家牌桌立體花牌展示區 -->
+      <div class="flower-zone flower-zone-2 empty-flower" id="flowers-2"></div>
+      <div class="flower-zone flower-zone-3 empty-flower" id="flowers-3"></div>
+      <div class="flower-zone flower-zone-1 empty-flower" id="flowers-1"></div>
+      <div class="flower-zone flower-zone-0 empty-flower" id="flowers-0"></div>
+
+      <!-- 中央立體羅盤 -->
+      <div class="center-compass">
+        <div id="compass-2" class="compass-wind-badge compass-top">西</div>
+        <div id="compass-3" class="compass-wind-badge compass-left">北</div>
+        <div id="compass-1" class="compass-wind-badge compass-right">南</div>
+        <div id="compass-0" class="compass-wind-badge compass-bottom">東</div>
+
+        <div class="text-center px-2">
+          <div id="compassRoundText" class="text-xs sm:text-sm font-bold text-amber-300 tracking-wider" style="font-family:'Noto Serif TC',serif;">
+            東風東局
+          </div>
+          <div id="compassLianText" class="text-[10px] text-rose-300 font-bold h-3.5"></div>
+          <div class="mt-1 px-2 py-0.5 rounded-full bg-emerald-950/90 border border-emerald-500/40 text-[11px] text-emerald-200 font-semibold">
+            餘 <span id="compassRemain" class="text-amber-300 font-bold">75</span> 張
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- 底部人類玩家操作區 (互動列 + 明牌/花牌 + 手牌) -->
+  <section class="player-dock">
+    <!-- 聽牌提示 + 狀態訊息 -->
+    <div class="flex flex-wrap items-center justify-center gap-2 max-w-[96vw]">
+      <div id="hud-0" class="flex items-center gap-2 px-3 py-1 rounded-full bg-[#0e1b15]/90 border border-amber-400/40 text-xs shadow"></div>
+      <div id="statusToast" class="px-3 py-1 rounded-full bg-black/60 border border-white/15 text-xs text-amber-100">
+        準備開局...
+      </div>
+      <div id="tenpaiBadge" class="hidden items-center gap-1.5 px-3 py-1 rounded-full bg-rose-950/90 border border-rose-400/70 text-xs text-amber-200 shadow-lg">
+        <span class="font-bold text-rose-300">🔥 聽牌</span>
+        <span id="tenpaiList" class="flex items-center gap-1"></span>
+      </div>
+    </div>
+
+    <!-- 吃 / 碰 / 槓 / 胡 / 過 發光操作列 -->
+    <div id="actionBarContainer" class="hidden flex-col items-center gap-2">
+      <!-- 多種吃牌 / 槓牌子選單 -->
+      <div id="subChoiceMenu" class="hidden flex-wrap items-center justify-center gap-2 px-3 py-2 rounded-2xl bg-[#0b1813]/95 border border-emerald-400/60 shadow-2xl"></div>
+      <!-- 主操作按鈕列 -->
+      <div id="actionBar" class="action-bar"></div>
+    </div>
+
+    <!-- 玩家吃碰槓明牌 + 手牌 -->
+    <div class="w-full flex flex-wrap items-end justify-center gap-3 px-1">
+      <div id="playerMelds" class="flex items-end gap-2"></div>
+      <div id="playerHand" class="flex items-end justify-center gap-[3px] sm:gap-1"></div>
+    </div>
+  </section>
+
+  <!-- 中央 3D 漢字特效橫幅容器 -->
+  <div id="fxOverlay" class="fx-banner-overlay"></div>
+
+  <!-- 結算彈窗 -->
+  <div id="settlementModal" class="hidden fixed inset-0 z-[90] bg-black/75 backdrop-blur-sm flex items-center justify-center p-3">
+    <div class="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-gradient-to-b from-[#152820] to-[#0b1511] border-2 border-amber-400/60 shadow-2xl p-5 sm:p-6">
+      <div class="flex items-center justify-between border-b border-amber-400/25 pb-3 mb-4">
+        <div>
+          <h2 id="settleTitle" class="text-2xl font-black text-amber-300" style="font-family:'Noto Serif TC',serif;">胡牌結算</h2>
+          <p id="settleSubtitle" class="text-xs sm:text-sm text-emerald-200/80 mt-0.5"></p>
+        </div>
+        <div id="settleTotalFanBadge" class="px-4 py-1.5 rounded-xl bg-gradient-to-r from-rose-700 to-amber-600 text-white font-black text-lg shadow"></div>
+      </div>
+
+      <!-- 胡牌牌型展示 -->
+      <div id="settleHandSection" class="mb-4 p-3 rounded-xl bg-black/35 border border-white/10">
+        <div class="text-xs text-amber-200/80 mb-2">胡牌牌型與花牌</div>
+        <div id="settleTiles" class="flex flex-wrap items-center gap-1.5"></div>
+      </div>
+
+      <!-- 台數明細 -->
+      <div id="settleFanSection" class="mb-4 p-3 rounded-xl bg-black/35 border border-white/10">
+        <div class="text-xs text-amber-200/80 mb-2">台數計算明細</div>
+        <div id="settleFanList" class="grid grid-cols-2 sm:grid-cols-3 gap-2 text-sm"></div>
+      </div>
+
+      <!-- 四家籌碼變化 -->
+      <div class="mb-5">
+        <div class="text-xs text-amber-200/80 mb-2">四家籌碼結算</div>
+        <div id="settleChipsList" class="grid grid-cols-2 sm:grid-cols-4 gap-2"></div>
+      </div>
+
+      <div class="flex justify-end gap-3">
+        <button id="btnNextRound" class="px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-stone-950 font-black text-base shadow-lg cursor-pointer transition">
+          下一局 ▶
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 底台設定彈窗 -->
+  <div id="settingsModal" class="hidden fixed inset-0 z-[95] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="w-full max-w-md rounded-2xl bg-[#10211a] border-2 border-amber-400/50 shadow-2xl p-5">
+      <h3 class="text-lg font-bold text-amber-300 mb-4" style="font-family:'Noto Serif TC',serif;">⚙️ 牌局底台與節奏設定</h3>
+      <div class="space-y-4 text-sm">
+        <div>
+          <label class="block text-emerald-200 mb-2 font-medium">選擇底台大小（即時套用於本局結算）</label>
+          <div class="grid grid-cols-2 gap-2" id="stakesOptions">
+            <button data-base="50" data-fan="20" class="stake-opt p-2.5 rounded-xl border border-white/15 bg-black/30 hover:bg-emerald-900/60 text-left cursor-pointer">
+              <div class="font-bold text-amber-200">50底 / 20台</div>
+              <div class="text-xs text-gray-400">休閒小玩</div>
+            </button>
+            <button data-base="100" data-fan="50" class="stake-opt p-2.5 rounded-xl border border-amber-400 bg-emerald-900/70 text-left cursor-pointer">
+              <div class="font-bold text-amber-200">100底 / 50台</div>
+              <div class="text-xs text-gray-300">標準場（預設）</div>
+            </button>
+            <button data-base="300" data-fan="100" class="stake-opt p-2.5 rounded-xl border border-white/15 bg-black/30 hover:bg-emerald-900/60 text-left cursor-pointer">
+              <div class="font-bold text-amber-200">300底 / 100台</div>
+              <div class="text-xs text-gray-400">進階高手場</div>
+            </button>
+            <button data-base="500" data-fan="200" class="stake-opt p-2.5 rounded-xl border border-white/15 bg-black/30 hover:bg-emerald-900/60 text-left cursor-pointer">
+              <div class="font-bold text-amber-200">500底 / 200台</div>
+              <div class="text-xs text-gray-400">豪氣大牌場</div>
+            </button>
+          </div>
+        </div>
+        <div>
+          <label class="block text-emerald-200 mb-2 font-medium">AI 出牌速度</label>
+          <div class="grid grid-cols-3 gap-2" id="speedOptions">
+            <button data-speed="850" class="speed-opt p-2 rounded-xl border border-white/15 bg-black/30 cursor-pointer">慢速</button>
+            <button data-speed="550" class="speed-opt p-2 rounded-xl border border-amber-400 bg-emerald-900/70 cursor-pointer">標準</button>
+            <button data-speed="280" class="speed-opt p-2 rounded-xl border border-white/15 bg-black/30 cursor-pointer">極速</button>
+          </div>
+        </div>
+      </div>
+      <div class="mt-5 flex justify-end">
+        <button id="btnCloseSettings" class="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold cursor-pointer">完成</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 規則說明彈窗 -->
+  <div id="rulesModal" class="hidden fixed inset-0 z-[95] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="w-full max-w-xl max-h-[85vh] overflow-y-auto rounded-2xl bg-[#10211a] border-2 border-amber-400/50 shadow-2xl p-5">
+      <div class="flex items-center justify-between border-b border-white/15 pb-3 mb-3">
+        <h3 class="text-lg font-bold text-amber-300" style="font-family:'Noto Serif TC',serif;">📖 台灣十六張麻將規則與台數表</h3>
+        <button id="btnCloseRulesTop" class="text-gray-300 hover:text-white text-xl cursor-pointer">✕</button>
+      </div>
+      <div class="space-y-3 text-xs sm:text-sm text-emerald-50/90 leading-relaxed">
+        <p><strong class="text-amber-300">基本規則：</strong>共 144 張牌（萬筒條各36、風牌16、三元牌12、花牌8）。莊家起手 17 張、閒家 16 張，自動補花。逆時針輪流摸打，牌牆剩餘 16 張（鐵八墩）流局。</p>
+        <p><strong class="text-amber-300">操作方式：</strong>輪到您出牌時，點一下手牌選取（牌會浮起），再點一次該牌（或雙擊）即可打出。當可吃、碰、槓、胡或自摸時，下方會彈出金色發光操作列。</p>
+        <p><strong class="text-amber-300">優先順序：</strong>胡牌 ＞ 碰 / 槓 ＞ 吃牌（僅限吃上家打出的牌）。</p>
+        <div class="p-3 rounded-xl bg-black/35 border border-white/10">
+          <div class="font-bold text-amber-300 mb-1.5">常見台數一覽：</div>
+          <ul class="grid grid-cols-1 sm:grid-cols-2 gap-1 text-xs">
+            <li>• 莊家：1台 / 連N拉N：2N台</li>
+            <li>• 門清：1台 / 自摸：1台</li>
+            <li>• 門清一摸三：3台</li>
+            <li>• 正花（對應門風）：各1台 / 花槓：2台</li>
+            <li>• 中/發/白刻子：各1台</li>
+            <li>• 圈風刻 / 門風刻：各1台</li>
+            <li>• 獨聽 / 邊張 / 中洞：1台</li>
+            <li>• 槓上開花 / 海底撈月：1台</li>
+            <li>• 平胡（無字花兩面聽非自摸）：2台</li>
+            <li>• 全求人：2台 / 半求人：1台</li>
+            <li>• 碰碰胡：4台 / 混一色：4台</li>
+            <li>• 清一色：8台 / 小三元：4台 / 大三元：8台</li>
+          </ul>
+        </div>
+      </div>
+      <div class="mt-4 flex justify-end">
+        <button id="btnCloseRules" class="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold cursor-pointer">我知道了</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+/**
+ * ============================================================================
+ * 3D 台灣十六張麻將 — 完整單檔引擎
+ * 包含：SVG 立體牌面繪製、Web Audio 音效合成、SpeechSynthesis 語音、
+ *       台灣十六張胡牌與台數結算引擎、AI 牌理評估、完整牌局狀態機。
+ * ============================================================================
+ */
+
+/* ============================ 1. 音效與語音系統 ============================ */
+const AudioEngine = (() => {
+  let ctx = null;
+  let soundEnabled = true;
+  let voiceEnabled = true;
+
+  function ensureCtx() {
+    if (!ctx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) ctx = new AC();
+    }
+    if (ctx && ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
+    return ctx;
+  }
+
+  function playNoiseBurst(duration, filterFreq, q, gainVal) {
+    const c = ensureCtx();
+    if (!c || !soundEnabled) return;
+    const bufferSize = Math.floor(c.sampleRate * duration);
+    const buffer = c.createBuffer(1, bufferSize, c.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.25));
+    }
+    const src = c.createBufferSource();
+    src.buffer = buffer;
+    const filter = c.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.value = filterFreq;
+    filter.Q.value = q;
+    const gain = c.createGain();
+    gain.gain.setValueAtTime(gainVal, c.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, c.currentTime + duration);
+    src.connect(filter);
+    filter.connect(gain);
+    gain.connect(c.destination);
+    src.start();
+  }
+
+  function playTone(freq, duration, type = 'triangle', gainVal = 0.2, delay = 0) {
+    const c = ensureCtx();
+    if (!c || !soundEnabled) return;
+    const now = c.currentTime + delay;
+    const osc = c.createOscillator();
+    const gain = c.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, now);
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.linearRampToValueAtTime(gainVal, now + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.0008, now + duration);
+    osc.connect(gain);
+    gain.connect(c.destination);
+    osc.start(now);
+    osc.stop(now + duration + 0.02);
+  }
+
+  return {
+    setSound(v) { soundEnabled = v; },
+    setVoice(v) { voiceEnabled = v; },
+    isSoundOn() { return soundEnabled; },
+    isVoiceOn() { return voiceEnabled; },
+
+    // 摸牌輕刷聲
+    playDraw() {
+      playNoiseBurst(0.065, 2200, 1.5, 0.14);
+      playTone(480, 0.045, 'sine', 0.05);
+    },
+
+    // 打牌清脆撞擊聲
+    playDiscard() {
+      playNoiseBurst(0.055, 2800, 3.2, 0.42);
+      playTone(1350, 0.05, 'triangle', 0.16);
+      playTone(620, 0.06, 'sine', 0.14);
+    },
+
+    // 吃/碰/槓重擊提示音
+    playAction() {
+      playNoiseBurst(0.08, 1900, 2.5, 0.55);
+      playTone(523.25, 0.14, 'triangle', 0.22, 0);
+      playTone(783.99, 0.2, 'triangle', 0.22, 0.06);
+    },
+
+    // 補花清脆音
+    playFlower() {
+      [659.25, 783.99, 1046.5].forEach((f, i) => playTone(f, 0.18, 'sine', 0.14, i * 0.05));
+    },
+
+    // 玩家可操作提示音
+    playPrompt() {
+      playTone(880, 0.12, 'sine', 0.14, 0);
+      playTone(1174.66, 0.18, 'sine', 0.16, 0.09);
+    },
+
+    // 胡牌 / 自摸 五聲音階勝利樂音
+    playWin() {
+      const notes = [523.25, 587.33, 659.25, 783.99, 880, 1046.5];
+      notes.forEach((f, i) => {
+        playTone(f, 0.32, 'triangle', 0.22, i * 0.085);
+        playTone(f * 2, 0.22, 'sine', 0.07, i * 0.085);
+      });
+    },
+
+    // 放槍 / 輸牌低沉音
+    playLose() {
+      playTone(260, 0.35, 'sawtooth', 0.12, 0);
+      playTone(220, 0.4, 'sawtooth', 0.12, 0.16);
+      playTone(174.6, 0.65, 'triangle', 0.18, 0.34);
+    },
+
+    // 流局鐘聲
+    playDrawGame() {
+      playTone(392, 0.9, 'sine', 0.2, 0);
+      playTone(587.33, 0.85, 'sine', 0.1, 0.02);
+      playTone(293.66, 1.1, 'triangle', 0.14, 0.25);
+    },
+
+    // 繁體中文語音播報
+    speak(text) {
+      if (!voiceEnabled) return;
+      try {
+        if ('speechSynthesis' in window) {
+          window.speechSynthesis.cancel();
+          const u = new SpeechSynthesisUtterance(text);
+          u.lang = 'zh-TW';
+          u.rate = 1.15;
+          u.pitch = 1.05;
+          u.volume = 0.9;
+          window.speechSynthesis.speak(u);
+        }
+      } catch (e) {
+        // 忽略瀏覽器語音不支援錯誤
+      }
+    }
+  };
+})();
+
+/* ============================ 2. 麻將牌資料與 SVG 繪製 ============================ */
+const WIND_CHARS = ['東', '南', '西', '北'];
+const CN_NUMS = ['', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
+const HONOR_CHARS = ['', '東', '南', '西', '北', '中', '發', '白'];
+const FLOWER_CHARS = ['', '春', '夏', '秋', '冬', '梅', '蘭', '竹', '菊'];
+
+const svgCache = {};
+
+/**
+ * 依據牌面代碼 (如 'm1', 'p5', 's1', 'z5', 'f1') 產生高辨識度 SVG
+ */
+function getTileSVG(code) {
+  if (svgCache[code]) return svgCache[code];
+  const suit = code[0];
+  const val = parseInt(code.slice(1), 10);
+  let inner = '';
+
+  if (suit === 'm') {
+    // 萬字牌：上方黑/深藍數字，下方朱紅「萬」
+    inner = `
+      <text x="50" y="47" text-anchor="middle" font-family="'Noto Serif TC', serif" font-weight="900" font-size="38" fill="#1e293b">${CN_NUMS[val]}</text>
+      <text x="50" y="98" text-anchor="middle" font-family="'Noto Serif TC', serif" font-weight="900" font-size="42" fill="#c81e1e">萬</text>
+    `;
+  } else if (suit === 'p') {
+    // 筒子牌：傳統幾何圓餅排列
+    const dot = (cx, cy, r, col) => `
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="${col}" stroke="#fff" stroke-width="1.5"/>
+      <circle cx="${cx}" cy="${cy}" r="${r * 0.56}" fill="none" stroke="#fff" stroke-width="2.2" stroke-dasharray="4 2.5"/>
+      <circle cx="${cx}" cy="${cy}" r="${r * 0.22}" fill="#fff"/>
+    `;
+    const layouts = {
+      1: () => `
+        <circle cx="50" cy="64" r="34" fill="#15803d" stroke="#1e3a8a" stroke-width="3"/>
+        <circle cx="50" cy="64" r="24" fill="#fef3c7" stroke="#dc2626" stroke-width="3" stroke-dasharray="7 4"/>
+        <circle cx="50" cy="64" r="13" fill="#dc2626"/>
+        <circle cx="50" cy="64" r="5" fill="#fef08a"/>
+      `,
+      2: () => dot(50, 36, 17, '#15803d') + dot(50, 92, 17, '#1d4ed8'),
+      3: () => dot(28, 30, 14, '#1d4ed8') + dot(50, 64, 14, '#dc2626') + dot(72, 98, 14, '#15803d'),
+      4: () => dot(30, 36, 15, '#1d4ed8') + dot(70, 36, 15, '#15803d') + dot(30, 92, 15, '#15803d') + dot(70, 92, 15, '#1d4ed8'),
+      5: () => dot(27, 32, 13, '#1d4ed8') + dot(73, 32, 13, '#15803d') + dot(50, 64, 13, '#dc2626') + dot(27, 96, 13, '#15803d') + dot(73, 96, 13, '#1d4ed8'),
+      6: () => dot(30, 26, 12.5, '#15803d') + dot(70, 26, 12.5, '#15803d') + dot(30, 66, 12.5, '#dc2626') + dot(70, 66, 12.5, '#dc2626') + dot(30, 98, 12.5, '#dc2626') + dot(70, 98, 12.5, '#dc2626'),
+      7: () => dot(25, 22, 11, '#15803d') + dot(50, 30, 11, '#15803d') + dot(75, 38, 11, '#15803d') + dot(31, 68, 12, '#dc2626') + dot(69, 68, 12, '#dc2626') + dot(31, 98, 12, '#dc2626') + dot(69, 98, 12, '#dc2626'),
+      8: () => [24, 50, 76, 102].map(y => dot(31, y, 11, '#1d4ed8') + dot(69, y, 11, '#1d4ed8')).join(''),
+      9: () => [26, 64, 102].map((y, idx) => {
+        const c = idx === 0 ? '#15803d' : idx === 1 ? '#dc2626' : '#1d4ed8';
+        return dot(22, y, 11, c) + dot(50, y, 11, c) + dot(78, y, 11, c);
+      }).join('')
+    };
+    inner = layouts[val]();
+  } else if (suit === 's') {
+    // 條子牌：一條為翡翠孔雀/麻雀圖樣，2~9 為立體竹節
+    const stick = (x, y, h, col) => `
+      <rect x="${x - 5}" y="${y}" width="10" height="${h}" rx="4" fill="${col}"/>
+      <line x1="${x - 5}" y1="${y + h * 0.5}" x2="${x + 5}" y2="${y + h * 0.5}" stroke="#fefce8" stroke-width="2.2"/>
+      <line x1="${x}" y1="${y + 3}" x2="${x}" y2="${y + h - 3}" stroke="rgba(255,255,255,0.4)" stroke-width="1.5"/>
+    `;
+    const layouts = {
+      1: () => `
+        <path d="M50 22 C65 22 72 34 64 46 C76 54 78 78 60 94 L50 108 L40 94 C22 78 24 54 36 46 C28 34 35 22 50 22 Z" fill="#15803d"/>
+        <circle cx="50" cy="36" r="10" fill="#dc2626"/>
+        <circle cx="46" cy="34" r="2.2" fill="#fff"/>
+        <path d="M35 66 Q50 54 65 66 Q50 92 35 66 Z" fill="#1d4ed8"/>
+        <path d="M42 74 L50 100 L58 74" fill="none" stroke="#fde047" stroke-width="3" stroke-linecap="round"/>
+      `,
+      2: () => stick(50, 18, 40, '#1d4ed8') + stick(50, 70, 40, '#15803d'),
+      3: () => stick(50, 18, 38, '#1d4ed8') + stick(30, 68, 40, '#15803d') + stick(70, 68, 40, '#15803d'),
+      4: () => stick(32, 18, 40, '#1d4ed8') + stick(68, 18, 40, '#15803d') + stick(32, 70, 40, '#15803d') + stick(68, 70, 40, '#1d4ed8'),
+      5: () => stick(25, 18, 38, '#15803d') + stick(75, 18, 38, '#1d4ed8') + stick(50, 44, 38, '#dc2626') + stick(25, 70, 38, '#1d4ed8') + stick(75, 70, 38, '#15803d'),
+      6: () => [25, 50, 75].map(x => stick(x, 18, 38, '#15803d') + stick(x, 68, 40, '#1d4ed8')).join(''),
+      7: () => stick(50, 12, 30, '#dc2626') + [25, 50, 75].map(x => stick(x, 48, 28, '#15803d') + stick(x, 82, 30, '#1d4ed8')).join(''),
+      8: () => stick(24, 16, 36, '#15803d') + stick(76, 16, 36, '#15803d') + stick(24, 72, 36, '#15803d') + stick(76, 72, 36, '#15803d') +
+               `<path d="M36 22 L50 48 L64 22" fill="none" stroke="#1d4ed8" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M36 102 L50 76 L64 102" fill="none" stroke="#1d4ed8" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>`,
+      9: () => [14, 48, 82].map(y => stick(24, y, 28, '#dc2626') + stick(50, y, 28, '#1d4ed8') + stick(76, y, 28, '#15803d')).join('')
+    };
+    inner = layouts[val]();
+  } else if (suit === 'z') {
+    // 風牌與三元牌
+    if (val === 7) {
+      // 白板：傳統藍框雙層方框
+      inner = `
+        <rect x="17" y="18" width="66" height="92" rx="8" fill="none" stroke="#1d4ed8" stroke-width="5"/>
+        <rect x="25" y="26" width="50" height="76" rx="4" fill="none" stroke="#60a5fa" stroke-width="2.2" stroke-dasharray="5 3"/>
+      `;
+    } else {
+      const col = val === 5 ? '#dc2626' : val === 6 ? '#15803d' : '#111827';
+      inner = `<text x="50" y="84" text-anchor="middle" font-family="'Noto Serif TC', serif" font-weight="900" font-size="60" fill="${col}">${HONOR_CHARS[val]}</text>`;
+    }
+  } else if (suit === 'f') {
+    // 花牌：右上角標示數字 1~4 + 鮮明繁體大字 + 季節/植物花卉裝飾
+    const num = val <= 4 ? val : val - 4;
+    const isSeason = val <= 4;
+    const numCol = isSeason ? '#dc2626' : '#1d4ed8';
+    const charCol = isSeason ? '#c81e1e' : (val === 6 || val === 7 ? '#15803d' : '#1e40af');
+    const accentCol = isSeason ? '#f59e0b' : '#10b981';
+
+    // 左上角精緻花卉/植物紋飾
+    const motif = isSeason
+      ? `<g transform="translate(22, 23)">
+           <circle cx="0" cy="-6" r="4.5" fill="#fb7185" opacity="0.9"/>
+           <circle cx="5.7" cy="-1.8" r="4.5" fill="#f43f5e" opacity="0.9"/>
+           <circle cx="3.5" cy="4.8" r="4.5" fill="#fb7185" opacity="0.9"/>
+           <circle cx="-3.5" cy="4.8" r="4.5" fill="#f43f5e" opacity="0.9"/>
+           <circle cx="-5.7" cy="-1.8" r="4.5" fill="#fb7185" opacity="0.9"/>
+           <circle cx="0" cy="0" r="3" fill="#fde047"/>
+         </g>`
+      : `<g transform="translate(22, 23)">
+           <path d="M0 9 Q-10 0 0 -10 Q10 0 0 9 Z" fill="#16a34a" opacity="0.9"/>
+           <path d="M0 9 Q10 3 10 -6 Q2 -2 0 9 Z" fill="#0d9488" opacity="0.85"/>
+           <line x1="0" y1="9" x2="0" y2="-7" stroke="#fef08a" stroke-width="1.4"/>
+         </g>`;
+
+    inner = `
+      <rect x="6" y="6" width="88" height="116" rx="8" fill="none" stroke="${accentCol}" stroke-width="2" stroke-opacity="0.45"/>
+      ${motif}
+      <text x="84" y="31" text-anchor="end" font-family="'Noto Sans TC', sans-serif" font-weight="900" font-size="25" fill="${numCol}">${num}</text>
+      <text x="50" y="88" text-anchor="middle" font-family="'Noto Serif TC', serif" font-weight="900" font-size="54" fill="${charCol}">${FLOWER_CHARS[val]}</text>
+      <text x="50" y="112" text-anchor="middle" font-family="'Noto Sans TC', sans-serif" font-weight="700" font-size="13" fill="${numCol}" opacity="0.85">${isSeason ? '四季花' : '四君子'}</text>
+    `;
+  }
+
+  const svg = `<svg viewBox="0 0 100 128" xmlns="http://www.w3.org/2000/svg">${inner}</svg>`;
+  svgCache[code] = svg;
+  return svg;
+}
+
+function getTileName(code) {
+  const s = code[0], v = parseInt(code.slice(1), 10);
+  if (s === 'm') return CN_NUMS[v] + '萬';
+  if (s === 'p') return CN_NUMS[v] + '筒';
+  if (s === 's') return CN_NUMS[v] + '條';
+  if (s === 'z') return HONOR_CHARS[v];
+  if (s === 'f') return FLOWER_CHARS[v];
+  return code;
+}
+
+function getSortKey(code) {
+  const map = { m: 10, p: 20, s: 30, z: 40, f: 50 };
+  return map[code[0]] + parseInt(code.slice(1), 10);
+}
+
+function buildFullDeck() {
+  const deck = [];
+  let id = 1;
+  ['m', 'p', 's'].forEach(suit => {
+    for (let v = 1; v <= 9; v++) {
+      for (let c = 0; c < 4; c++) {
+        const code = suit + v;
+        deck.push({ id: id++, code, suit, val: v, sortKey: getSortKey(code) });
+      }
+    }
+  });
+  for (let v = 1; v <= 7; v++) {
+    for (let c = 0; c < 4; c++) {
+      const code = 'z' + v;
+      deck.push({ id: id++, code, suit: 'z', val: v, sortKey: getSortKey(code) });
+    }
+  }
+  for (let v = 1; v <= 8; v++) {
+    const code = 'f' + v;
+    deck.push({ id: id++, code, suit: 'f', val: v, sortKey: getSortKey(code) });
+  }
+  // Fisher-Yates 洗牌
+  for (let i = deck.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [deck[i], deck[j]] = [deck[j], deck[i]];
+  }
+  return deck;
+}
+
+function sortTiles(arr) {
+  return arr.sort((a, b) => a.sortKey - b.sortKey || a.id - b.id);
+}
+
+/* ============================ 3. 胡牌判定與台數計算引擎 ============================ */
+
+/**
+ * 找出手牌所有合法的「5面子(扣掉已吃碰槓數) + 1對眼」拆解方式
+ * @param {string[]} handCodes - 手牌代碼陣列 (含胡牌張)
+ * @param {number} neededMelds - 尚需組成的面子數量 (5 - player.melds.length)
+ */
+function getWinDecompositions(handCodes, neededMelds) {
+  if (handCodes.length !== neededMelds * 3 + 2) return [];
+  const counts = {};
+  for (const c of handCodes) counts[c] = (counts[c] || 0) + 1;
+  const uniqueCodes = Object.keys(counts).sort((a, b) => getSortKey(a) - getSortKey(b));
+  const results = [];
+
+  function solveMelds(remCounts, meldsLeft, currentSets) {
+    if (meldsLeft === 0) {
+      results.push({ pair: currentPair, sets: currentSets.slice() });
+      return;
+    }
+    // 找第一張數量 > 0 的牌
+    let first = null;
+    for (const c of uniqueCodes) {
+      if (remCounts[c] > 0) { first = c; break; }
+    }
+    if (!first) return;
+
+    // 1. 嘗試刻子
+    if (remCounts[first] >= 3) {
+      remCounts[first] -= 3;
+      currentSets.push({ type: 'tri', codes: [first, first, first] });
+      solveMelds(remCounts, meldsLeft - 1, currentSets);
+      currentSets.pop();
+      remCounts[first] += 3;
+    }
+
+    // 2. 嘗試順子 (僅萬/筒/條)
+    const suit = first[0];
+    const val = parseInt(first.slice(1), 10);
+    if ((suit === 'm' || suit === 'p' || suit === 's') && val <= 7) {
+      const c2 = suit + (val + 1);
+      const c3 = suit + (val + 2);
+      if (remCounts[c2] > 0 && remCounts[c3] > 0) {
+        remCounts[first]--;
+        remCounts[c2]--;
+        remCounts[c3]--;
+        currentSets.push({ type: 'seq', codes: [first, c2, c3] });
+        solveMelds(remCounts, meldsLeft - 1, currentSets);
+        currentSets.pop();
+        remCounts[first]++;
+        remCounts[c2]++;
+        remCounts[c3]++;
+      }
+    }
+  }
+
+  let currentPair = null;
+  for (const c of uniqueCodes) {
+    if (counts[c] >= 2) {
+      counts[c] -= 2;
+      currentPair = c;
+      solveMelds(counts, neededMelds, []);
+      counts[c] += 2;
+    }
+  }
+  return results;
+}
+
+function canHu(handTiles, meldsCount, extraCode = null) {
+  const codes = handTiles.map(t => t.code);
+  if (extraCode) codes.push(extraCode);
+  return getWinDecompositions(codes, 5 - meldsCount).length > 0;
+}
+
+/**
+ * 計算目前手牌 (張數為 3k+1) 聽哪些牌
+ */
+function getWaitingTiles(handTiles, meldsCount) {
+  if (handTiles.length !== (5 - meldsCount) * 3 + 1) return [];
+  const allCandidates = [];
+  ['m', 'p', 's'].forEach(s => { for (let v = 1; v <= 9; v++) allCandidates.push(s + v); });
+  for (let v = 1; v <= 7; v++) allCandidates.push('z' + v);
+  const waits = [];
+  for (const code of allCandidates) {
+    if (canHu(handTiles, meldsCount, code)) waits.push(code);
+  }
+  return waits;
+}
+
+/**
+ * 台灣十六張麻將台數結算引擎
+ * 會遍歷所有合法胡牌拆解，取最高台數方案
+ */
+function calculateTaiwanScore(params) {
+  const {
+    winnerIdx,
+    handTilesBeforeWin, // 不含胡牌張的手牌
+    winTileCode,
+    melds,              // [{ type: 'chow'|'pong'|'kong_open'|'kong_concealed'|'kong_added', tiles: [...] }]
+    flowers,            // [tile, ...]
+    isSelfDraw,
+    isKongDraw,
+    isLastTile,
+    roundWind,          // 0..3
+    dealerIdx,
+    lianZhuang
+  } = params;
+
+  const seatWind = (winnerIdx - dealerIdx + 4) % 4; // 0:東 1:南 2:西 3:北
+  const fullHandCodes = handTilesBeforeWin.map(t => t.code).concat([winTileCode]);
+  const decomps = getWinDecompositions(fullHandCodes, 5 - melds.length);
+  const waits = getWaitingTiles(handTilesBeforeWin, melds.length);
+  const isSingleWait = waits.length === 1;
+
+  // 門清判定：沒有吃、碰、明槓、加槓 (暗槓算門清)
+  const openMeldsCount = melds.filter(m => m.type !== 'kong_concealed').length;
+  const isMenQing = openMeldsCount === 0;
+
+  let bestResult = null;
+
+  for (const dec of decomps) {
+    const fans = [];
+    const addFan = (name, count) => { if (count > 0) fans.push({ name, count }); };
+
+    // 1. 門清 / 自摸 / 門清一摸三
+    if (isMenQing && isSelfDraw) {
+      addFan('門清一摸三', 3);
+    } else if (isMenQing) {
+      addFan('門清', 1);
+    } else if (isSelfDraw) {
+      addFan('自摸', 1);
+    }
+
+    // 2. 槓上開花 / 海底撈月
+    if (isKongDraw && isSelfDraw) addFan('槓上開花', 1);
+    if (isLastTile) addFan(isSelfDraw ? '海底撈月' : '河底撈魚', 1);
+
+    // 3. 花牌計算 (正花 / 花槓)
+    const fVals = flowers.map(f => f.val);
+    const hasAllSeasons = [1, 2, 3, 4].every(v => fVals.includes(v));
+    const hasAllPlants = [5, 6, 7, 8].every(v => fVals.includes(v));
+    if (hasAllSeasons) addFan('花槓(四季)', 2);
+    if (hasAllPlants) addFan('花槓(四君子)', 2);
+    const mySeason = seatWind + 1;
+    const myPlant = seatWind + 5;
+    if (!hasAllSeasons && fVals.includes(mySeason)) addFan(`正花(${FLOWER_CHARS[mySeason]})`, 1);
+    if (!hasAllPlants && fVals.includes(myPlant)) addFan(`正花(${FLOWER_CHARS[myPlant]})`, 1);
+
+    // 彙整所有 5 組面子
+    const allSets = [
+      ...melds.map(m => ({
+        type: m.type === 'chow' ? 'seq' : 'tri',
+        codes: m.tiles.map(t => t.code)
+      })),
+      ...dec.sets
+    ];
+
+    // 4. 三元牌與大小三元
+    const dragonCodes = ['z5', 'z6', 'z7'];
+    let dragonTriCount = 0;
+    const dragonTriSet = new Set();
+    for (const s of allSets) {
+      if (s.type === 'tri' && dragonCodes.includes(s.codes[0])) {
+        dragonTriCount++;
+        dragonTriSet.add(s.codes[0]);
+      }
+    }
+    const dragonPair = dragonCodes.includes(dec.pair);
+    if (dragonTriCount === 3) {
+      addFan('大三元', 8);
+    } else if (dragonTriCount === 2 && dragonPair) {
+      addFan('小三元', 4);
+    } else {
+      if (dragonTriSet.has('z5')) addFan('紅中', 1);
+      if (dragonTriSet.has('z6')) addFan('青發', 1);
+      if (dragonTriSet.has('z7')) addFan('白板', 1);
+    }
+
+    // 5. 圈風刻 / 門風刻
+    const roundWindCode = 'z' + (roundWind + 1);
+    const seatWindCode = 'z' + (seatWind + 1);
+    for (const s of allSets) {
+      if (s.type === 'tri') {
+        if (s.codes[0] === roundWindCode) addFan(`圈風(${WIND_CHARS[roundWind]})`, 1);
+        if (s.codes[0] === seatWindCode) addFan(`門風(${WIND_CHARS[seatWind]})`, 1);
+      }
+    }
+
+    // 6. 碰碰胡
+    const allTriplets = allSets.every(s => s.type === 'tri');
+    if (allTriplets) addFan('碰碰胡', 4);
+
+    // 7. 清一色 / 混一色 / 字一色
+    const allTileCodes = [...fullHandCodes, ...melds.flatMap(m => m.tiles.map(t => t.code))];
+    const numSuits = new Set(allTileCodes.filter(c => c[0] !== 'z').map(c => c[0]));
+    const hasHonor = allTileCodes.some(c => c[0] === 'z');
+    if (numSuits.size === 0 && hasHonor) {
+      addFan('字一色', 8);
+    } else if (numSuits.size === 1 && !hasHonor) {
+      addFan('清一色', 8);
+    } else if (numSuits.size === 1 && hasHonor) {
+      addFan('混一色', 4);
+    }
+
+    // 8. 獨聽 / 邊張 / 中洞
+    if (isSingleWait) {
+      let waitLabel = '獨聽';
+      if (dec.pair !== winTileCode) {
+        for (const s of dec.sets) {
+          if (s.type === 'seq' && s.codes.includes(winTileCode)) {
+            const idx = s.codes.indexOf(winTileCode);
+            const v0 = parseInt(s.codes[0].slice(1), 10);
+            if (idx === 1) waitLabel = '中洞';
+            else if ((v0 === 1 && idx === 2) || (v0 === 7 && idx === 0)) waitLabel = '邊張';
+          }
+        }
+      }
+      addFan(waitLabel, 1);
+    }
+
+    // 9. 平胡 (台灣規則：全順子、無字牌、無花牌、非自摸、兩面聽)
+    const allSeq = allSets.every(s => s.type === 'seq');
+    if (allSeq && !hasHonor && flowers.length === 0 && !isSelfDraw && !isSingleWait) {
+      addFan('平胡', 2);
+    }
+
+    // 10. 全求人 / 半求人
+    if (openMeldsCount === 5) {
+      if (!isSelfDraw) addFan('全求人', 2);
+      else addFan('半求人', 1);
+    }
+
+    const totalFan = fans.reduce((acc, f) => acc + f.count, 0);
+    if (!bestResult || totalFan > bestResult.totalFan) {
+      bestResult = { fans, totalFan };
+    }
+  }
+
+  return bestResult || { fans: [], totalFan: 0 };
+}
+
+/* ============================ 4. AI 牌理評估模組 ============================ */
+function chooseAIDiscard(player) {
+  const hand = player.hand;
+  const counts = {};
+  hand.forEach(t => counts[t.code] = (counts[t.code] || 0) + 1);
+
+  let worstIdx = 0;
+  let worstScore = Infinity;
+
+  for (let i = 0; i < hand.length; i++) {
+    const t = hand[i];
+    const c = t.code;
+    let score = 0;
+
+    // 刻子與對子加分
+    if (counts[c] >= 3) score += 38;
+    else if (counts[c] === 2) score += 20;
+
+    if (t.suit === 'z') {
+      // 孤張字牌最優先打出
+      if (counts[c] === 1) score -= 14;
+      // 三元牌略微保留
+      if (t.val >= 5) score += 3;
+    } else {
+      const s = t.suit, v = t.val;
+      const m2 = counts[s + (v - 2)] || 0;
+      const m1 = counts[s + (v - 1)] || 0;
+      const p1 = counts[s + (v + 1)] || 0;
+      const p2 = counts[s + (v + 2)] || 0;
+
+      // 完整順子
+      if ((m1 && p1) || (m2 && m1) || (p1 && p2)) score += 28;
+      // 兩面搭子
+      if (m1) score += 11;
+      if (p1) score += 11;
+      // 嵌張搭子
+      if (m2) score += 5;
+      if (p2) score += 5;
+
+      // 中張優於邊張
+      if (v === 1 || v === 9) score -= 5;
+      else if (v === 2 || v === 8) score -= 2;
+      else score += 2;
+    }
+
+    // 微幅隨機擾動，讓三家 AI 風格更自然
+    score += Math.random() * 1.8;
+
+    if (score < worstScore) {
+      worstScore = score;
+      worstIdx = i;
+    }
+  }
+  return worstIdx;
+}
+
+function shouldAIPong(player, tileCode, roundWind, dealerIdx) {
+  const seatWind = (player.seat - dealerIdx + 4) % 4;
+  // 三元牌或圈門風必碰
+  if (tileCode === 'z5' || tileCode === 'z6' || tileCode === 'z7') return true;
+  if (tileCode === 'z' + (roundWind + 1) || tileCode === 'z' + (seatWind + 1)) return true;
+  // 其他牌有 72% 機率碰，讓牌局更有互動感
+  return Math.random() < 0.72;
+}
+
+function shouldAIChow(player, combos) {
+  if (combos.length === 0) return null;
+  // 挑選不破壞現有對子/刻子的組合
+  const counts = {};
+  player.hand.forEach(t => counts[t.code] = (counts[t.code] || 0) + 1);
+  for (const combo of combos) {
+    const breaksPair = combo.useCodes.some(c => counts[c] >= 2);
+    if (!breaksPair && Math.random() < 0.62) return combo;
+  }
+  return null;
+}
+
+/* ============================ 5. 主遊戲狀態與流程控制 ============================ */
+const GameState = {
+  sessionId: 0,
+  baseStake: 100,
+  fanStake: 50,
+  aiDelay: 550,
+  roundWind: 0,      // 0:東 1:南 2:西 3:北
+  dealerIdx: 0,      // 0..3
+  lianZhuang: 0,
+  wall: [],
+  turnIdx: 0,
+  phase: 'IDLE',     // IDLE | PLAYER_TURN | AI_TURN | WAIT_HUMAN_CLAIM | ROUND_OVER
+  selectedTileId: null,
+  lastDrawnTileId: null,
+  lastDiscard: null, // { seat, tile }
+  isKongDraw: false,
+  pendingHumanClaim: null,
+  players: [
+    { seat: 0, name: '你', avatar: '😎', isAI: false, chips: 10000, hand: [], melds: [], discards: [], flowers: [] },
+    { seat: 1, name: '紅軍', avatar: '🧔', isAI: true, chips: 10000, hand: [], melds: [], discards: [], flowers: [] },
+    { seat: 2, name: '美玲', avatar: '👩', isAI: true, chips: 10000, hand: [], melds: [], discards: [], flowers: [] },
+    { seat: 3, name: '皓子', avatar: '👴', isAI: true, chips: 10000, hand: [], melds: [], discards: [], flowers: [] }
+  ]
+};
+
+function sleep(ms, sessionId) {
+  return new Promise(resolve => {
+    setTimeout(() => resolve(sessionId === GameState.sessionId), ms);
+  });
+}
+
+/* ============================ 6. 吃/碰/槓 合法組合檢查 ============================ */
+function getChowCombos(player, targetCode) {
+  const s = targetCode[0];
+  if (s !== 'm' && s !== 'p' && s !== 's') return [];
+  const v = parseInt(targetCode.slice(1), 10);
+  const has = (code) => player.hand.some(t => t.code === code);
+  const combos = [];
+  // [v-2, v-1, v]
+  if (v >= 3 && has(s + (v - 2)) && has(s + (v - 1))) {
+    combos.push({ useCodes: [s + (v - 2), s + (v - 1)], allCodes: [s + (v - 2), s + (v - 1), targetCode] });
+  }
+  // [v-1, v, v+1]
+  if (v >= 2 && v <= 8 && has(s + (v - 1)) && has(s + (v + 1))) {
+    combos.push({ useCodes: [s + (v - 1), s + (v + 1)], allCodes: [s + (v - 1), targetCode, s + (v + 1)] });
+  }
+  // [v, v+1, v+2]
+  if (v <= 7 && has(s + (v + 1)) && has(s + (v + 2))) {
+    combos.push({ useCodes: [s + (v + 1), s + (v + 2)], allCodes: [targetCode, s + (v + 1), s + (v + 2)] });
+  }
+  return combos;
+}
+
+function canPong(player, targetCode) {
+  return player.hand.filter(t => t.code === targetCode).length >= 2;
+}
+
+function canOpenKong(player, targetCode) {
+  return player.hand.filter(t => t.code === targetCode).length >= 3 && GameState.wall.length > 16;
+}
+
+function getSelfKongOptions(player) {
+  if (GameState.wall.length <= 16) return [];
+  const options = [];
+  const counts = {};
+  player.hand.forEach(t => counts[t.code] = (counts[t.code] || 0) + 1);
+  // 暗槓 (手牌4張)
+  for (const code in counts) {
+    if (counts[code] === 4) options.push({ type: 'kong_concealed', code });
+  }
+  // 加槓 (手牌1張 + 已有碰牌)
+  for (const m of player.melds) {
+    if (m.type === 'pong' && counts[m.tiles[0].code] >= 1) {
+      options.push({ type: 'kong_added', code: m.tiles[0].code, meldRef: m });
+    }
+  }
+  return options;
+}
+
+/* ============================ 7. 特效橫幅與狀態提示 ============================ */
+function showFXBanner(text, theme = 'red') {
+  const overlay = document.getElementById('fxOverlay');
+  const el = document.createElement('div');
+  el.className = `fx-banner ${theme === 'green' ? 'fx-green' : theme === 'purple' ? 'fx-purple' : theme === 'gold' ? 'fx-gold' : ''}`;
+  el.textContent = text;
+  overlay.innerHTML = '';
+  overlay.appendChild(el);
+  setTimeout(() => {
+    if (el.parentNode === overlay) overlay.removeChild(el);
+  }, 1200);
+}
+
+function setStatus(msg) {
+  document.getElementById('statusToast').textContent = msg;
+}
+
+/* ============================ 8. 畫面渲染引擎 ============================ */
+function createTileEl(tile, sizeClass = 'mj-tile-sm', extraClasses = '') {
+  const div = document.createElement('div');
+  div.className = `mj-tile ${sizeClass} ${extraClasses}`;
+  div.innerHTML = getTileSVG(tile.code);
+  div.title = getTileName(tile.code);
+  return div;
+}
+
+function createBackTileEl(sizeClass = 'mj-tile-xs') {
+  const div = document.createElement('div');
+  div.className = `mj-tile mj-tile-back ${sizeClass}`;
+  return div;
+}
+
+function renderAll() {
+  renderCompass();
+  renderHUDs();
+  renderAIHandsAndMelds();
+  renderDiscards();
+  renderTableFlowers();
+  renderPlayerArea();
+}
+
+/**
+ * 將四家已補花的花牌以 3D 立體麻將牌渲染於牌桌專屬花牌區，
+ * 並自動判斷各家門風「正花」加上金色光暈與「正」字角標。
+ */
+function renderTableFlowers() {
+  for (let s = 0; s < 4; s++) {
+    const p = GameState.players[s];
+    const zone = document.getElementById(`flowers-${s}`);
+    if (!zone) continue;
+
+    const seatWind = (s - GameState.dealerIdx + 4) % 4; // 0:東 1:南 2:西 3:北
+    const zhengSeason = seatWind + 1;
+    const zhengPlant = seatWind + 5;
+
+    zone.innerHTML = '';
+    zone.classList.toggle('empty-flower', p.flowers.length === 0);
+
+    const label = document.createElement('div');
+    label.className = 'flower-zone-label';
+    label.innerHTML = `<span>🌸 ${p.name}花牌</span><span class="text-emerald-300/90">${p.flowers.length > 0 ? p.flowers.length + '張' : '無'}</span>`;
+    zone.appendChild(label);
+
+    if (p.flowers.length > 0) {
+      const row = document.createElement('div');
+      row.className = 'flower-tiles-row';
+      const sortedFlowers = sortTiles(p.flowers.slice());
+      sortedFlowers.forEach(tile => {
+        const isZheng = tile.val === zhengSeason || tile.val === zhengPlant;
+        const el = createTileEl(tile, 'mj-tile-flower', isZheng ? 'flower-zheng' : '');
+        el.title = `${getTileName(tile.code)}${isZheng ? '（正花 +1台）' : ''}`;
+        row.appendChild(el);
+      });
+      zone.appendChild(row);
+    }
+  }
+}
+
+function renderCompass() {
+  const dealerWindName = WIND_CHARS[GameState.dealerIdx];
+  document.getElementById('compassRoundText').textContent = `${WIND_CHARS[GameState.roundWind]}風${dealerWindName}局`;
+  document.getElementById('compassLianText').textContent = GameState.lianZhuang > 0 ? `連${GameState.lianZhuang}拉${GameState.lianZhuang}` : '';
+  document.getElementById('compassRemain').textContent = Math.max(0, GameState.wall.length - 16);
+
+  for (let s = 0; s < 4; s++) {
+    const el = document.getElementById(`compass-${s}`);
+    const seatWind = (s - GameState.dealerIdx + 4) % 4;
+    el.textContent = WIND_CHARS[seatWind];
+    el.classList.toggle('active-turn', GameState.turnIdx === s && GameState.phase !== 'ROUND_OVER');
+    el.classList.toggle('dealer-mark', GameState.dealerIdx === s);
+  }
+}
+
+function renderHUDs() {
+  for (let s = 0; s < 4; s++) {
+    const p = GameState.players[s];
+    const seatWind = WIND_CHARS[(s - GameState.dealerIdx + 4) % 4];
+    const isDealer = GameState.dealerIdx === s;
+    const isActive = GameState.turnIdx === s && GameState.phase !== 'ROUND_OVER';
+    const hud = document.getElementById(`hud-${s}`);
+    const flowerHtml = p.flowers.length
+      ? `<div class="flex flex-wrap gap-0.5 mt-0.5">${p.flowers.map(f => `<span class="px-1 py-0.2 text-[10px] rounded bg-amber-500/25 border border-amber-400/40 text-amber-200">${FLOWER_CHARS[f.val]}</span>`).join('')}</div>`
+      : '';
+
+    if (s === 0) {
+      hud.innerHTML = `
+        <span class="text-base">${p.avatar}</span>
+        <span class="font-bold text-amber-200">${p.name}</span>
+        <span class="px-1.5 py-0.5 rounded bg-emerald-800/80 text-emerald-100 text-[10px] font-bold">${seatWind}</span>
+        ${isDealer ? `<span class="px-1.5 py-0.5 rounded bg-rose-600 text-white text-[10px] font-bold">莊</span>` : ''}
+        <span class="font-bold text-amber-300">$${p.chips.toLocaleString()}</span>
+        ${p.flowers.length ? `<span class="flex items-center gap-0.5 ml-1">${p.flowers.map(f => `<span class="px-1 rounded bg-amber-500/30 border border-amber-300/50 text-amber-100 text-[10px]">${FLOWER_CHARS[f.val]}</span>`).join('')}</span>` : ''}
+      `;
+    } else {
+      hud.classList.toggle('active-hud', isActive);
+      hud.innerHTML = `
+        <div class="flex items-center justify-between gap-2">
+          <div class="flex items-center gap-1.5">
+            <span class="text-base">${p.avatar}</span>
+            <span class="text-xs font-bold text-white">${p.name}</span>
+          </div>
+          <div class="flex items-center gap-1">
+            <span class="px-1 rounded bg-emerald-800/80 text-[10px] text-emerald-100 font-bold">${seatWind}</span>
+            ${isDealer ? `<span class="px-1 rounded bg-rose-600 text-[10px] text-white font-bold">莊</span>` : ''}
+          </div>
+        </div>
+        <div class="text-xs font-bold text-amber-300">$${p.chips.toLocaleString()}</div>
+        ${flowerHtml}
+      `;
+    }
+  }
+}
+
+function renderAIHandsAndMelds() {
+  [1, 2, 3].forEach(seat => {
+    const p = GameState.players[seat];
+    const container = document.getElementById(`ai-area-${seat}`);
+    container.innerHTML = '';
+
+    // 牌背（簡潔顯示剩餘手牌數量的立體牌背）
+    const handWrap = document.createElement('div');
+    handWrap.className = seat === 2 ? 'flex gap-[2px]' : 'flex flex-col gap-[2px]';
+    const visibleBacks = Math.min(p.hand.length, seat === 2 ? 16 : 11);
+    for (let i = 0; i < visibleBacks; i++) {
+      const b = createBackTileEl(seat === 2 ? 'mj-tile-xs' : 'ai-side-back');
+      handWrap.appendChild(b);
+    }
+    container.appendChild(handWrap);
+
+    // AI 明牌區 (吃/碰/槓)
+    if (p.melds.length > 0) {
+      const meldsWrap = document.createElement('div');
+      meldsWrap.className = seat === 2
+        ? 'flex gap-1.5'
+        : `flex flex-col gap-1 ${seat === 3 ? 'items-start' : 'items-end'}`;
+      const tileSizeCls = seat === 2 ? 'mj-tile-xs' : 'ai-side-meld-tile';
+      p.melds.forEach(m => {
+        const g = document.createElement('div');
+        g.className = 'flex gap-[1px] bg-black/30 p-0.5 rounded';
+        m.tiles.forEach((t, idx) => {
+          if (m.type === 'kong_concealed' && (idx === 0 || idx === 3)) {
+            g.appendChild(createBackTileEl(tileSizeCls));
+          } else {
+            g.appendChild(createTileEl(t, tileSizeCls));
+          }
+        });
+        meldsWrap.appendChild(g);
+      });
+      container.appendChild(meldsWrap);
+    }
+  });
+}
+
+function renderDiscards() {
+  for (let s = 0; s < 4; s++) {
+    const p = GameState.players[s];
+    const zone = document.getElementById(`discards-${s}`);
+    zone.innerHTML = '';
+    p.discards.forEach((tile, idx) => {
+      const isLatest = GameState.lastDiscard && GameState.lastDiscard.seat === s && idx === p.discards.length - 1;
+      const el = createTileEl(tile, 'mj-tile-xs', isLatest ? 'latest-discard' : '');
+      zone.appendChild(el);
+    });
+  }
+}
+
+function renderPlayerArea() {
+  const p = GameState.players[0];
+
+  // 明牌區
+  const meldsEl = document.getElementById('playerMelds');
+  meldsEl.innerHTML = '';
+  p.melds.forEach(m => {
+    const group = document.createElement('div');
+    group.className = 'flex items-end gap-[2px] px-1.5 py-1 rounded-lg bg-black/40 border border-amber-400/25';
+    m.tiles.forEach((t, idx) => {
+      if (m.type === 'kong_concealed' && (idx === 0 || idx === 3)) {
+        group.appendChild(createBackTileEl('mj-tile-sm'));
+      } else {
+        group.appendChild(createTileEl(t, 'mj-tile-sm'));
+      }
+    });
+    meldsEl.appendChild(group);
+  });
+
+  // 手牌區
+  const handEl = document.getElementById('playerHand');
+  handEl.innerHTML = '';
+
+  // 將新摸進的牌獨立靠右顯示，其餘自動理牌
+  let orderedHand = p.hand.slice();
+  let drawnTile = null;
+  if (GameState.lastDrawnTileId && GameState.turnIdx === 0 && GameState.phase === 'PLAYER_TURN') {
+    const idx = orderedHand.findIndex(t => t.id === GameState.lastDrawnTileId);
+    if (idx !== -1) {
+      drawnTile = orderedHand.splice(idx, 1)[0];
+    }
+  }
+  sortTiles(orderedHand);
+  if (drawnTile) orderedHand.push(drawnTile);
+
+  orderedHand.forEach((tile, idx) => {
+    const isDrawn = drawnTile && idx === orderedHand.length - 1;
+    const isSelected = GameState.selectedTileId === tile.id;
+    const el = createTileEl(
+      tile,
+      'mj-tile-hand',
+      `${isDrawn ? 'drawn-gap' : ''} ${isSelected ? 'selected' : ''}`
+    );
+
+    el.addEventListener('click', () => handlePlayerTileClick(tile));
+    el.addEventListener('dblclick', () => {
+      if (GameState.phase === 'PLAYER_TURN' && GameState.turnIdx === 0) {
+        executeDiscard(0, tile.id);
+      }
+    });
+    handEl.appendChild(el);
+  });
+
+  // 聽牌即時提示 (非輪到出牌、手牌為 3k+1 時)
+  const tenpaiBadge = document.getElementById('tenpaiBadge');
+  const tenpaiList = document.getElementById('tenpaiList');
+  if (p.hand.length === (5 - p.melds.length) * 3 + 1 && GameState.phase !== 'ROUND_OVER') {
+    const waits = getWaitingTiles(p.hand, p.melds.length);
+    if (waits.length > 0) {
+      tenpaiBadge.classList.remove('hidden');
+      tenpaiBadge.classList.add('flex');
+      tenpaiList.innerHTML = waits.map(c => `<span class="px-1.5 py-0.5 rounded bg-amber-500/25 border border-amber-300/60 text-amber-100 font-bold">${getTileName(c)}</span>`).join('');
+    } else {
+      tenpaiBadge.classList.add('hidden');
+      tenpaiBadge.classList.remove('flex');
+    }
+  } else {
+    tenpaiBadge.classList.add('hidden');
+    tenpaiBadge.classList.remove('flex');
+  }
+}
+
+/* ============================ 9. 互動操作列 (吃/碰/槓/胡/過) ============================ */
+function hideActionBar() {
+  document.getElementById('actionBarContainer').classList.add('hidden');
+  document.getElementById('actionBarContainer').classList.remove('flex');
+  document.getElementById('subChoiceMenu').classList.add('hidden');
+  document.getElementById('subChoiceMenu').classList.remove('flex');
+  document.getElementById('actionBar').innerHTML = '';
+  document.getElementById('subChoiceMenu').innerHTML = '';
+}
+
+function showActionBar(buttons) {
+  const container = document.getElementById('actionBarContainer');
+  const bar = document.getElementById('actionBar');
+  const sub = document.getElementById('subChoiceMenu');
+  bar.innerHTML = '';
+  sub.innerHTML = '';
+  sub.classList.add('hidden');
+  sub.classList.remove('flex');
+
+  buttons.forEach(b => {
+    const btn = document.createElement('button');
+    btn.className = `act-btn ${b.cls}`;
+    btn.textContent = b.label;
+    btn.addEventListener('click', b.onClick);
+    bar.appendChild(btn);
+  });
+
+  container.classList.remove('hidden');
+  container.classList.add('flex');
+  AudioEngine.playPrompt();
+}
+
+function showSubChoiceMenu(title, items, onPick) {
+  const sub = document.getElementById('subChoiceMenu');
+  sub.innerHTML = `<span class="text-xs font-bold text-amber-300 mr-1">${title}：</span>`;
+  items.forEach(item => {
+    const btn = document.createElement('button');
+    btn.className = 'flex items-center gap-0.5 p-1.5 rounded-xl bg-emerald-950/90 hover:bg-emerald-800 border border-amber-400/50 cursor-pointer transition hover:scale-105';
+    item.codes.forEach(code => {
+      btn.appendChild(createTileEl({ code }, 'mj-tile-sm'));
+    });
+    btn.addEventListener('click', () => onPick(item.value));
+    sub.appendChild(btn);
+  });
+  sub.classList.remove('hidden');
+  sub.classList.add('flex');
+}
+
+/* ============================ 10. 牌局流程核心邏輯 ============================ */
+async function startNewRound() {
+  GameState.sessionId++;
+  const sid = GameState.sessionId;
+  hideActionBar();
+  document.getElementById('settlementModal').classList.add('hidden');
+
+  GameState.wall = buildFullDeck();
+  GameState.lastDiscard = null;
+  GameState.selectedTileId = null;
+  GameState.lastDrawnTileId = null;
+  GameState.isKongDraw = false;
+  GameState.phase = 'DEALING';
+
+  GameState.players.forEach(p => {
+    p.hand = [];
+    p.melds = [];
+    p.discards = [];
+    p.flowers = [];
+  });
+
+  // 發牌：每家16張，莊家多1張 (共17張)
+  for (let i = 0; i < 16; i++) {
+    for (let step = 0; step < 4; step++) {
+      const s = (GameState.dealerIdx + step) % 4;
+      GameState.players[s].hand.push(GameState.wall.shift());
+    }
+  }
+  GameState.players[GameState.dealerIdx].hand.push(GameState.wall.shift());
+
+  setStatus('正在發牌與開局補花...');
+  renderAll();
+  if (!(await sleep(350, sid))) return;
+
+  // 開局自動補花 (從莊家開始逆時針，逐家補花並即時將立體花牌擺上牌桌)
+  for (let step = 0; step < 4; step++) {
+    const s = (GameState.dealerIdx + step) % 4;
+    const replacedFlowers = replaceInitialFlowers(s);
+    if (replacedFlowers.length > 0) {
+      const p = GameState.players[s];
+      sortTiles(p.hand);
+      AudioEngine.playFlower();
+      showFXBanner('補花！', 'gold');
+      AudioEngine.speak('補花');
+      setStatus(`${p.name} 開局補花：${replacedFlowers.map(f => FLOWER_CHARS[f.val]).join('、')}`);
+      renderAll();
+      if (!(await sleep(700, sid))) return;
+    }
+  }
+
+  GameState.players.forEach(p => sortTiles(p.hand));
+  renderAll();
+
+  // 莊家先手
+  GameState.turnIdx = GameState.dealerIdx;
+  const dealer = GameState.players[GameState.dealerIdx];
+  GameState.lastDrawnTileId = dealer.hand[dealer.hand.length - 1].id;
+  renderAll();
+
+  if (GameState.dealerIdx === 0) {
+    enterHumanTurn();
+  } else {
+    enterAITurn(GameState.dealerIdx, sid);
+  }
+}
+
+function replaceInitialFlowers(seat) {
+  const p = GameState.players[seat];
+  const replaced = [];
+  let idx = p.hand.findIndex(t => t.suit === 'f');
+  while (idx !== -1 && GameState.wall.length > 0) {
+    const [fl] = p.hand.splice(idx, 1);
+    p.flowers.push(fl);
+    replaced.push(fl);
+    p.hand.push(GameState.wall.pop()); // 從牌尾補牌
+    idx = p.hand.findIndex(t => t.suit === 'f');
+  }
+  return replaced;
+}
+
+/**
+ * 輪到指定玩家摸牌 (含自動補花與流局檢查)
+ */
+async function drawForPlayer(seat, fromBack = false) {
+  const sid = GameState.sessionId;
+  GameState.turnIdx = seat;
+  GameState.isKongDraw = fromBack;
+
+  // 檢查鐵八墩 (剩餘16張即流局)
+  if (GameState.wall.length <= 16) {
+    handleDrawGame();
+    return;
+  }
+
+  const p = GameState.players[seat];
+  let tile = fromBack ? GameState.wall.pop() : GameState.wall.shift();
+  AudioEngine.playDraw();
+
+  // 摸到花牌自動補花，立即擺放於牌桌花牌區並從牌尾補牌
+  while (tile && tile.suit === 'f') {
+    p.flowers.push(tile);
+    AudioEngine.playFlower();
+    showFXBanner('補花！', 'gold');
+    AudioEngine.speak('補花');
+    setStatus(`${p.name} 補花（${FLOWER_CHARS[tile.val]}）並從牌尾補牌`);
+    renderAll();
+    if (!(await sleep(720, sid))) return;
+
+    if (GameState.wall.length <= 16) {
+      handleDrawGame();
+      return;
+    }
+    tile = GameState.wall.pop();
+  }
+
+  p.hand.push(tile);
+  GameState.lastDrawnTileId = tile.id;
+  renderAll();
+
+  if (seat === 0) {
+    enterHumanTurn();
+  } else {
+    enterAITurn(seat, sid);
+  }
+}
+
+function enterHumanTurn() {
+  GameState.phase = 'PLAYER_TURN';
+  GameState.selectedTileId = null;
+  const p = GameState.players[0];
+
+  // 檢查自摸 / 暗槓 / 加槓
+  const canSelfHu = canHu(p.hand, p.melds.length);
+  const kongOpts = getSelfKongOptions(p);
+
+  if (canSelfHu || kongOpts.length > 0) {
+    const btns = [];
+    if (canSelfHu) {
+      btns.push({
+        label: '自摸',
+        cls: 'act-hu',
+        onClick: () => {
+          hideActionBar();
+          const winTile = p.hand.find(t => t.id === GameState.lastDrawnTileId) || p.hand[p.hand.length - 1];
+          const handBefore = p.hand.filter(t => t.id !== winTile.id);
+          executeWin(0, null, winTile, handBefore, true);
+        }
+      });
+    }
+    if (kongOpts.length > 0) {
+      btns.push({
+        label: '槓',
+        cls: 'act-kong',
+        onClick: () => {
+          if (kongOpts.length === 1) {
+            hideActionBar();
+            executeSelfKong(0, kongOpts[0]);
+          } else {
+            showSubChoiceMenu(
+              '選擇槓牌',
+              kongOpts.map(opt => ({
+                codes: [opt.code, opt.code, opt.code, opt.code],
+                value: opt
+              })),
+              (chosen) => {
+                hideActionBar();
+                executeSelfKong(0, chosen);
+              }
+            );
+          }
+        }
+      });
+    }
+    btns.push({
+      label: '過',
+      cls: 'act-pass',
+      onClick: () => {
+        hideActionBar();
+        setStatus('輪到您出牌，點擊手牌選取、再點一次打出');
+      }
+    });
+    showActionBar(btns);
+    setStatus(canSelfHu ? '恭喜！您已自摸胡牌！' : '您可進行暗槓/加槓，或直接點牌打出');
+  } else {
+    setStatus('輪到您出牌，點一下選牌、再點一次（或雙擊）打出');
+  }
+  renderAll();
+}
+
+function handlePlayerTileClick(tile) {
+  if (GameState.phase !== 'PLAYER_TURN' || GameState.turnIdx !== 0) return;
+  if (GameState.selectedTileId === tile.id) {
+    hideActionBar();
+    executeDiscard(0, tile.id);
+  } else {
+    GameState.selectedTileId = tile.id;
+    renderPlayerArea();
+  }
+}
+
+async function enterAITurn(seat, sid) {
+  GameState.phase = 'AI_TURN';
+  const p = GameState.players[seat];
+  setStatus(`輪到 ${p.name} 思考出牌...`);
+  if (!(await sleep(GameState.aiDelay, sid))) return;
+
+  // 1. 檢查 AI 自摸
+  if (canHu(p.hand, p.melds.length)) {
+    const winTile = p.hand.find(t => t.id === GameState.lastDrawnTileId) || p.hand[p.hand.length - 1];
+    const handBefore = p.hand.filter(t => t.id !== winTile.id);
+    executeWin(seat, null, winTile, handBefore, true);
+    return;
+  }
+
+  // 2. 檢查 AI 暗槓 / 加槓
+  const kongOpts = getSelfKongOptions(p);
+  if (kongOpts.length > 0) {
+    await executeSelfKong(seat, kongOpts[0]);
+    return;
+  }
+
+  // 3. AI 選擇打出一張牌
+  sortTiles(p.hand);
+  const discardIdx = chooseAIDiscard(p);
+  const tile = p.hand[discardIdx];
+  executeDiscard(seat, tile.id);
+}
+
+async function executeSelfKong(seat, opt) {
+  const sid = GameState.sessionId;
+  const p = GameState.players[seat];
+  if (opt.type === 'kong_concealed') {
+    const removed = [];
+    for (let i = 0; i < 4; i++) {
+      const idx = p.hand.findIndex(t => t.code === opt.code);
+      if (idx !== -1) removed.push(p.hand.splice(idx, 1)[0]);
+    }
+    p.melds.push({ type: 'kong_concealed', tiles: removed });
+  } else if (opt.type === 'kong_added') {
+    const idx = p.hand.findIndex(t => t.code === opt.code);
+    if (idx !== -1) {
+      const [added] = p.hand.splice(idx, 1);
+      opt.meldRef.type = 'kong_added';
+      opt.meldRef.tiles.push(added);
+    }
+  }
+
+  AudioEngine.playAction();
+  showFXBanner('槓', 'purple');
+  AudioEngine.speak('槓');
+  setStatus(`${p.name} ${opt.type === 'kong_concealed' ? '暗槓' : '加槓'} ${getTileName(opt.code)}`);
+  renderAll();
+  if (!(await sleep(650, sid))) return;
+
+  // 槓牌後從牌尾補牌
+  drawForPlayer(seat, true);
+}
+
+/**
+ * 執行打牌並依台灣麻將優先順序 (胡 > 碰/槓 > 吃) 處理其餘三家回應
+ */
+async function executeDiscard(seat, tileId) {
+  const sid = GameState.sessionId;
+  const p = GameState.players[seat];
+  const idx = p.hand.findIndex(t => t.id === tileId);
+  if (idx === -1) return;
+
+  const [tile] = p.hand.splice(idx, 1);
+  sortTiles(p.hand);
+  p.discards.push(tile);
+  GameState.lastDiscard = { seat, tile };
+  GameState.selectedTileId = null;
+  GameState.lastDrawnTileId = null;
+  GameState.isKongDraw = false;
+
+  AudioEngine.playDiscard();
+  setStatus(`${p.name} 打出 ${getTileName(tile.code)}`);
+  renderAll();
+
+  if (!(await sleep(260, sid))) return;
+
+  // 檢查其他三家是否有胡、碰/槓、吃
+  const nextSeat = (seat + 1) % 4;
+  const otherSeats = [1, 2, 3].map(offset => (seat + offset) % 4); // 逆時針順序
+
+  // 1) 檢查胡牌 (優先級最高)
+  const huSeats = otherSeats.filter(s => canHu(GameState.players[s].hand, GameState.players[s].melds.length, tile.code));
+  const humanCanHu = huSeats.includes(0);
+
+  // 2) 檢查碰/明槓
+  const humanCanPong = seat !== 0 && canPong(GameState.players[0], tile.code);
+  const humanCanOpenKong = seat !== 0 && canOpenKong(GameState.players[0], tile.code);
+  const humanChowCombos = nextSeat === 0 ? getChowCombos(GameState.players[0], tile.code) : [];
+
+  // 若有 AI 可胡牌且人類不能胡，AI 直接胡牌 (優先於人類碰/吃)
+  if (huSeats.length > 0 && !humanCanHu) {
+    const winner = huSeats[0];
+    if (!(await sleep(300, sid))) return;
+    executeWin(winner, seat, tile, GameState.players[winner].hand.slice(), false);
+    return;
+  }
+
+  // 檢查是否有 AI 要碰/槓 (若人類只能吃，且 AI 要碰，AI 碰優先於人類吃)
+  let aiPongSeat = null;
+  let aiKongSeat = null;
+  for (const s of otherSeats) {
+    if (s === 0) continue;
+    const aiP = GameState.players[s];
+    if (canOpenKong(aiP, tile.code)) {
+      aiKongSeat = s;
+      break;
+    }
+    if (canPong(aiP, tile.code) && shouldAIPong(aiP, tile.code, GameState.roundWind, GameState.dealerIdx)) {
+      aiPongSeat = s;
+      break;
+    }
+  }
+
+  // 若人類不能胡也不能碰/槓，但 AI 要碰/槓 -> 直接由 AI 碰/槓
+  if (!humanCanHu && !humanCanPong && !humanCanOpenKong && (aiKongSeat !== null || aiPongSeat !== null)) {
+    if (!(await sleep(320, sid))) return;
+    if (aiKongSeat !== null) {
+      await executeOpenKong(aiKongSeat, seat, tile);
+    } else {
+      await executePong(aiPongSeat, seat, tile);
+    }
+    return;
+  }
+
+  // 若人類有任意可用操作 (胡 / 槓 / 碰 / 吃)，彈出互動操作列等待玩家選擇
+  if (humanCanHu || humanCanOpenKong || humanCanPong || humanChowCombos.length > 0) {
+    GameState.phase = 'WAIT_HUMAN_CLAIM';
+    setStatus(`${p.name} 打出【${getTileName(tile.code)}】，請選擇操作！`);
+
+    const resumeAfterHumanPass = async () => {
+      hideActionBar();
+      // 若人類選擇「過」，依優先順序看 AI 是否要胡/槓/碰/吃
+      const aiHu = huSeats.find(s => s !== 0);
+      if (aiHu !== undefined) {
+        executeWin(aiHu, seat, tile, GameState.players[aiHu].hand.slice(), false);
+        return;
+      }
+      if (aiKongSeat !== null) {
+        await executeOpenKong(aiKongSeat, seat, tile);
+        return;
+      }
+      if (aiPongSeat !== null) {
+        await executePong(aiPongSeat, seat, tile);
+        return;
+      }
+      // 檢查下家 AI 是否要吃
+      if (nextSeat !== 0) {
+        const combos = getChowCombos(GameState.players[nextSeat], tile.code);
+        const chosen = shouldAIChow(GameState.players[nextSeat], combos);
+        if (chosen) {
+          await executeChow(nextSeat, seat, tile, chosen);
+          return;
+        }
+      }
+      drawForPlayer(nextSeat, false);
+    };
+
+    const btns = [];
+    if (humanCanHu) {
+      btns.push({
+        label: '胡',
+        cls: 'act-hu',
+        onClick: () => {
+          hideActionBar();
+          executeWin(0, seat, tile, GameState.players[0].hand.slice(), false);
+        }
+      });
+    }
+    if (humanCanOpenKong) {
+      btns.push({
+        label: '槓',
+        cls: 'act-kong',
+        onClick: () => {
+          hideActionBar();
+          executeOpenKong(0, seat, tile);
+        }
+      });
+    }
+    if (humanCanPong) {
+      btns.push({
+        label: '碰',
+        cls: 'act-pong',
+        onClick: () => {
+          hideActionBar();
+          executePong(0, seat, tile);
+        }
+      });
+    }
+    if (humanChowCombos.length > 0) {
+      btns.push({
+        label: '吃',
+        cls: 'act-chow',
+        onClick: () => {
+          if (humanChowCombos.length === 1) {
+            hideActionBar();
+            executeChow(0, seat, tile, humanChowCombos[0]);
+          } else {
+            showSubChoiceMenu(
+              '選擇吃牌組合',
+              humanChowCombos.map(c => ({ codes: c.allCodes, value: c })),
+              (chosenCombo) => {
+                hideActionBar();
+                executeChow(0, seat, tile, chosenCombo);
+              }
+            );
+          }
+        }
+      });
+    }
+    btns.push({
+      label: '過',
+      cls: 'act-pass',
+      onClick: resumeAfterHumanPass
+    });
+
+    showActionBar(btns);
+    return;
+  }
+
+  // 無人胡/碰/槓，檢查下家 AI 是否吃牌
+  if (nextSeat !== 0) {
+    const combos = getChowCombos(GameState.players[nextSeat], tile.code);
+    const chosen = shouldAIChow(GameState.players[nextSeat], combos);
+    if (chosen) {
+      if (!(await sleep(300, sid))) return;
+      await executeChow(nextSeat, seat, tile, chosen);
+      return;
+    }
+  }
+
+  // 正常換下一家摸牌
+  drawForPlayer(nextSeat, false);
+}
+
+async function executePong(seat, fromSeat, tile) {
+  const sid = GameState.sessionId;
+  const p = GameState.players[seat];
+  GameState.players[fromSeat].discards.pop();
+  GameState.lastDiscard = null;
+
+  const meldTiles = [tile];
+  for (let i = 0; i < 2; i++) {
+    const idx = p.hand.findIndex(t => t.code === tile.code);
+    if (idx !== -1) meldTiles.push(p.hand.splice(idx, 1)[0]);
+  }
+  p.melds.push({ type: 'pong', tiles: meldTiles });
+  GameState.turnIdx = seat;
+
+  AudioEngine.playAction();
+  showFXBanner('碰', 'gold');
+  AudioEngine.speak('碰');
+  setStatus(`${p.name} 碰了 ${getTileName(tile.code)}！`);
+  renderAll();
+
+  if (seat === 0) {
+    GameState.phase = 'PLAYER_TURN';
+    setStatus('您已碰牌，請打出一張牌');
+  } else {
+    if (!(await sleep(GameState.aiDelay, sid))) return;
+    sortTiles(p.hand);
+    const dIdx = chooseAIDiscard(p);
+    executeDiscard(seat, p.hand[dIdx].id);
+  }
+}
+
+async function executeOpenKong(seat, fromSeat, tile) {
+  const sid = GameState.sessionId;
+  const p = GameState.players[seat];
+  GameState.players[fromSeat].discards.pop();
+  GameState.lastDiscard = null;
+
+  const meldTiles = [tile];
+  for (let i = 0; i < 3; i++) {
+    const idx = p.hand.findIndex(t => t.code === tile.code);
+    if (idx !== -1) meldTiles.push(p.hand.splice(idx, 1)[0]);
+  }
+  p.melds.push({ type: 'kong_open', tiles: meldTiles });
+  GameState.turnIdx = seat;
+
+  AudioEngine.playAction();
+  showFXBanner('槓', 'purple');
+  AudioEngine.speak('槓');
+  setStatus(`${p.name} 明槓 ${getTileName(tile.code)}！`);
+  renderAll();
+
+  if (!(await sleep(650, sid))) return;
+  drawForPlayer(seat, true);
+}
+
+async function executeChow(seat, fromSeat, tile, combo) {
+  const sid = GameState.sessionId;
+  const p = GameState.players[seat];
+  GameState.players[fromSeat].discards.pop();
+  GameState.lastDiscard = null;
+
+  const meldTiles = [tile];
+  combo.useCodes.forEach(code => {
+    const idx = p.hand.findIndex(t => t.code === code);
+    if (idx !== -1) meldTiles.push(p.hand.splice(idx, 1)[0]);
+  });
+  sortTiles(meldTiles);
+  p.melds.push({ type: 'chow', tiles: meldTiles });
+  GameState.turnIdx = seat;
+
+  AudioEngine.playAction();
+  showFXBanner('吃', 'green');
+  AudioEngine.speak('吃');
+  setStatus(`${p.name} 吃了 ${getTileName(tile.code)}！`);
+  renderAll();
+
+  if (seat === 0) {
+    GameState.phase = 'PLAYER_TURN';
+    setStatus('您已吃牌，請打出一張牌');
+  } else {
+    if (!(await sleep(GameState.aiDelay, sid))) return;
+    sortTiles(p.hand);
+    const dIdx = chooseAIDiscard(p);
+    executeDiscard(seat, p.hand[dIdx].id);
+  }
+}
+
+/* ============================ 11. 胡牌結算與流局處理 ============================ */
+function executeWin(winnerIdx, loserIdx, winTile, handBeforeWin, isSelfDraw) {
+  GameState.phase = 'ROUND_OVER';
+  hideActionBar();
+
+  const winner = GameState.players[winnerIdx];
+  const isLastTile = GameState.wall.length === 16;
+
+  // 播放特效與語音
+  if (winnerIdx === 0) {
+    AudioEngine.playWin();
+  } else {
+    AudioEngine.playLose();
+  }
+  showFXBanner(isSelfDraw ? '自摸' : '胡牌', 'red');
+  AudioEngine.speak(isSelfDraw ? '自摸' : '胡牌');
+
+  // 計算基本牌型台數
+  const scoreRes = calculateTaiwanScore({
+    winnerIdx,
+    handTilesBeforeWin: handBeforeWin,
+    winTileCode: winTile.code,
+    melds: winner.melds,
+    flowers: winner.flowers,
+    isSelfDraw,
+    isKongDraw: GameState.isKongDraw,
+    isLastTile,
+    roundWind: GameState.roundWind,
+    dealerIdx: GameState.dealerIdx,
+    lianZhuang: GameState.lianZhuang
+  });
+
+  // 莊家與連莊拉莊加成
+  const dealerBonusFan = 1 + 2 * GameState.lianZhuang;
+  const chipDeltas = [0, 0, 0, 0];
+  const displayFans = scoreRes.fans.slice();
+
+  const base = GameState.baseStake;
+  const perFan = GameState.fanStake;
+  const dealerIsWinner = winnerIdx === GameState.dealerIdx;
+
+  if (dealerIsWinner) {
+    displayFans.unshift({ name: '莊家', count: 1 });
+    if (GameState.lianZhuang > 0) {
+      displayFans.unshift({ name: `連${GameState.lianZhuang}拉${GameState.lianZhuang}`, count: GameState.lianZhuang * 2 });
+    }
+  }
+
+  let totalDisplayedFan = scoreRes.totalFan + (dealerIsWinner ? dealerBonusFan : 0);
+
+  if (isSelfDraw) {
+    for (let s = 0; s < 4; s++) {
+      if (s === winnerIdx) continue;
+      const extraDealer = (dealerIsWinner || s === GameState.dealerIdx) ? dealerBonusFan : 0;
+      const pay = base + (scoreRes.totalFan + extraDealer) * perFan;
+      chipDeltas[s] -= pay;
+      chipDeltas[winnerIdx] += pay;
+    }
+  } else {
+    const extraDealer = (dealerIsWinner || loserIdx === GameState.dealerIdx) ? dealerBonusFan : 0;
+    if (!dealerIsWinner && loserIdx === GameState.dealerIdx) {
+      displayFans.unshift({ name: '莊家放槍', count: 1 });
+      if (GameState.lianZhuang > 0) {
+        displayFans.unshift({ name: `連${GameState.lianZhuang}拉${GameState.lianZhuang}`, count: GameState.lianZhuang * 2 });
+      }
+      totalDisplayedFan += dealerBonusFan;
+    }
+    const pay = base + (scoreRes.totalFan + extraDealer) * perFan;
+    chipDeltas[loserIdx] -= pay;
+    chipDeltas[winnerIdx] += pay;
+  }
+
+  // 套用籌碼增減
+  for (let s = 0; s < 4; s++) {
+    GameState.players[s].chips += chipDeltas[s];
+  }
+
+  // 更新莊家與連莊規則 (莊家胡牌連莊，否則逆時針換莊)
+  let nextDealerText = '';
+  if (winnerIdx === GameState.dealerIdx) {
+    GameState.lianZhuang++;
+    nextDealerText = `莊家 ${winner.name} 連莊（連${GameState.lianZhuang}）`;
+  } else {
+    GameState.lianZhuang = 0;
+    GameState.dealerIdx = (GameState.dealerIdx + 1) % 4;
+    if (GameState.dealerIdx === 0) {
+      GameState.roundWind = (GameState.roundWind + 1) % 4;
+    }
+    nextDealerText = `下局換莊：${GameState.players[GameState.dealerIdx].name} 做莊`;
+  }
+
+  renderAll();
+
+  // 顯示結算彈窗
+  setTimeout(() => {
+    openSettlementModal({
+      isDrawGame: false,
+      winner,
+      loser: loserIdx !== null ? GameState.players[loserIdx] : null,
+      isSelfDraw,
+      handBeforeWin,
+      winTile,
+      melds: winner.melds,
+      flowers: winner.flowers,
+      fans: displayFans,
+      totalFan: totalDisplayedFan,
+      chipDeltas,
+      nextDealerText
+    });
+  }, 950);
+}
+
+function handleDrawGame() {
+  GameState.phase = 'ROUND_OVER';
+  hideActionBar();
+  AudioEngine.playDrawGame();
+  showFXBanner('流局', 'gold');
+  AudioEngine.speak('流局');
+  setStatus('牌牆剩餘 16 張（鐵八墩），本局流局！');
+
+  // 流局莊家連莊
+  GameState.lianZhuang++;
+  const dealer = GameState.players[GameState.dealerIdx];
+
+  setTimeout(() => {
+    openSettlementModal({
+      isDrawGame: true,
+      chipDeltas: [0, 0, 0, 0],
+      nextDealerText: `流局不換莊，${dealer.name} 繼續連莊（連${GameState.lianZhuang}）`
+    });
+  }, 950);
+}
+
+function openSettlementModal(info) {
+  const modal = document.getElementById('settlementModal');
+  const titleEl = document.getElementById('settleTitle');
+  const subEl = document.getElementById('settleSubtitle');
+  const fanBadge = document.getElementById('settleTotalFanBadge');
+  const handSec = document.getElementById('settleHandSection');
+  const fanSec = document.getElementById('settleFanSection');
+  const tilesEl = document.getElementById('settleTiles');
+  const fanListEl = document.getElementById('settleFanList');
+  const chipsEl = document.getElementById('settleChipsList');
+
+  if (info.isDrawGame) {
+    titleEl.textContent = '牌局流局（臭莊）';
+    subEl.textContent = `牌牆剩餘 16 張鐵八墩 • ${info.nextDealerText}`;
+    fanBadge.textContent = '0 台';
+    handSec.classList.add('hidden');
+    fanSec.classList.add('hidden');
+  } else {
+    handSec.classList.remove('hidden');
+    fanSec.classList.remove('hidden');
+    titleEl.textContent = `${info.winner.avatar} ${info.winner.name} ${info.isSelfDraw ? '自摸胡牌！' : '胡牌！'}`;
+    subEl.textContent = `${info.isSelfDraw ? '三家全付' : `${info.loser.name} 放槍獨付`} • ${GameState.baseStake}底 / ${GameState.fanStake}台 • ${info.nextDealerText}`;
+    fanBadge.textContent = `共 ${info.totalFan} 台`;
+
+    // 渲染胡牌牌型
+    tilesEl.innerHTML = '';
+    info.melds.forEach(m => {
+      const g = document.createElement('div');
+      g.className = 'flex gap-0.5 mr-1.5 p-1 rounded bg-white/10';
+      m.tiles.forEach(t => g.appendChild(createTileEl(t, 'mj-tile-sm')));
+      tilesEl.appendChild(g);
+    });
+    const sortedHand = sortTiles(info.handBeforeWin.slice());
+    sortedHand.forEach(t => tilesEl.appendChild(createTileEl(t, 'mj-tile-sm')));
+
+    const winEl = createTileEl(info.winTile, 'mj-tile-sm', 'ml-2 latest-discard');
+    tilesEl.appendChild(winEl);
+
+    if (info.flowers.length > 0) {
+      const flWrap = document.createElement('div');
+      flWrap.className = 'flex items-center gap-0.5 ml-2 pl-2 border-l border-white/20';
+      info.flowers.forEach(f => flWrap.appendChild(createTileEl(f, 'mj-tile-xs')));
+      tilesEl.appendChild(flWrap);
+    }
+
+    // 台數清單
+    fanListEl.innerHTML = info.fans.length > 0
+      ? info.fans.map(f => `
+          <div class="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-emerald-950/80 border border-emerald-500/30">
+            <span class="text-emerald-100">${f.name}</span>
+            <span class="font-bold text-amber-300">+${f.count}台</span>
+          </div>`).join('')
+      : `<div class="col-span-full text-emerald-200/80 text-xs">底胡（0台，僅計底注 ${GameState.baseStake}）</div>`;
+  }
+
+  // 四家籌碼結算
+  chipsEl.innerHTML = GameState.players.map((p, idx) => {
+    const delta = info.chipDeltas[idx];
+    const deltaStr = delta > 0 ? `+${delta.toLocaleString()}` : delta < 0 ? `${delta.toLocaleString()}` : '±0';
+    const deltaCol = delta > 0 ? 'text-emerald-400' : delta < 0 ? 'text-rose-400' : 'text-gray-400';
+    return `
+      <div class="p-2.5 rounded-xl bg-black/40 border ${delta > 0 ? 'border-emerald-400/60' : delta < 0 ? 'border-rose-500/40' : 'border-white/10'} text-center">
+        <div class="text-xs text-gray-300">${p.avatar} ${p.name}</div>
+        <div class="text-base font-black ${deltaCol} mt-0.5">${deltaStr}</div>
+        <div class="text-xs text-amber-200/90 mt-0.5">總籌碼 $${p.chips.toLocaleString()}</div>
+      </div>
+    `;
+  }).join('');
+
+  modal.classList.remove('hidden');
+}
+
+/* ============================ 12. 頂部按鈕與設定事件綁定 ============================ */
+function initControls() {
+  const btnSound = document.getElementById('btnSound');
+  const btnVoice = document.getElementById('btnVoice');
+
+  btnSound.addEventListener('click', () => {
+    const next = !AudioEngine.isSoundOn();
+    AudioEngine.setSound(next);
+    btnSound.textContent = next ? '🔊 音效' : '🔇 靜音';
+    btnSound.classList.toggle('opacity-60', !next);
+  });
+
+  btnVoice.addEventListener('click', () => {
+    const next = !AudioEngine.isVoiceOn();
+    AudioEngine.setVoice(next);
+    btnVoice.textContent = next ? '🗣️ 語音' : '🔕 關語音';
+    btnVoice.classList.toggle('opacity-60', !next);
+  });
+
+  // 底台設定彈窗
+  const settingsModal = document.getElementById('settingsModal');
+  document.getElementById('btnSettings').addEventListener('click', () => settingsModal.classList.remove('hidden'));
+  document.getElementById('btnCloseSettings').addEventListener('click', () => settingsModal.classList.add('hidden'));
+
+  document.querySelectorAll('.stake-opt').forEach(btn => {
+    btn.addEventListener('click', () => {
+      GameState.baseStake = parseInt(btn.dataset.base, 10);
+      GameState.fanStake = parseInt(btn.dataset.fan, 10);
+      document.getElementById('topStakesLabel').textContent = `${GameState.baseStake}底 / ${GameState.fanStake}台`;
+      document.querySelectorAll('.stake-opt').forEach(b => {
+        b.classList.remove('border-amber-400', 'bg-emerald-900/70');
+        b.classList.add('border-white/15', 'bg-black/30');
+      });
+      btn.classList.add('border-amber-400', 'bg-emerald-900/70');
+      btn.classList.remove('border-white/15', 'bg-black/30');
+    });
+  });
+
+  document.querySelectorAll('.speed-opt').forEach(btn => {
+    btn.addEventListener('click', () => {
+      GameState.aiDelay = parseInt(btn.dataset.speed, 10);
+      document.querySelectorAll('.speed-opt').forEach(b => {
+        b.classList.remove('border-amber-400', 'bg-emerald-900/70');
+        b.classList.add('border-white/15', 'bg-black/30');
+      });
+      btn.classList.add('border-amber-400', 'bg-emerald-900/70');
+      btn.classList.remove('border-white/15', 'bg-black/30');
+    });
+  });
+
+  // 規則彈窗
+  const rulesModal = document.getElementById('rulesModal');
+  document.getElementById('btnRules').addEventListener('click', () => rulesModal.classList.remove('hidden'));
+  document.getElementById('btnCloseRules').addEventListener('click', () => rulesModal.classList.add('hidden'));
+  document.getElementById('btnCloseRulesTop').addEventListener('click', () => rulesModal.classList.add('hidden'));
+
+  // 重新開局 (重設籌碼與圈風)
+  document.getElementById('btnRestart').addEventListener('click', () => {
+    GameState.roundWind = 0;
+    GameState.dealerIdx = 0;
+    GameState.lianZhuang = 0;
+    GameState.players.forEach(p => p.chips = 10000);
+    startNewRound();
+  });
+
+  // 下一局
+  document.getElementById('btnNextRound').addEventListener('click', () => {
+    startNewRound();
+  });
+}
+
+// 啟動遊戲
+window.addEventListener('load', () => {
+  initControls();
+  startNewRound();
+});
+</script>
+</body>
+</html>

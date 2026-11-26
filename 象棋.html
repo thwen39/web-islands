@@ -1,0 +1,1029 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Premium 3D Xiangqi (Chinese Chess)</title>
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+        background-color: #1a1a1a;
+        font-family:
+          "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+        user-select: none;
+      }
+      #ui-container {
+        position: absolute;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        pointer-events: none;
+        text-align: center;
+        color: #f0f0f0;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+      }
+      #turn-indicator {
+        font-size: 24px;
+        font-weight: bold;
+        padding: 10px 20px;
+        background: rgba(0, 0, 0, 0.6);
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        backdrop-filter: blur(4px);
+      }
+      .red-turn {
+        color: #e74c3c !important;
+      }
+      .black-turn {
+        color: #3498db !important;
+      }
+      #loading {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: white;
+        font-size: 20px;
+        background: rgba(0, 0, 0, 0.8);
+        padding: 20px;
+        border-radius: 8px;
+        transition: opacity 0.5s;
+      }
+    </style>
+    <!-- Strictly strictly using the requested importmap -->
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div id="ui-container">
+      <div id="turn-indicator" class="red-turn">Red's Turn</div>
+    </div>
+    <div id="loading">Generating Textures & Scene...</div>
+
+    <script type="module">
+      import * as THREE from "three";
+      import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+      import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
+
+      // --- Game Constants & State ---
+      const SPACING = 10;
+      const BOARD_COLS = 9;
+      const BOARD_ROWS = 10;
+
+      let scene, camera, renderer, controls;
+      let boardMesh;
+      const pieces = [];
+      let selectedPiece = null;
+      let isRedTurn = true;
+      let isAIACTIVE = false;
+      const raycaster = new THREE.Raycaster();
+      const mouse = new THREE.Vector2();
+
+      // 2D Array mapping [y][x] to logical piece object for AI
+      const logicalState = Array.from({ length: BOARD_ROWS }, () =>
+        Array(BOARD_COLS).fill(null),
+      );
+
+      // Piece types and initial setup
+      const INITIAL_SETUP = [
+        // Red Pieces (Bottom, y: 0-3)
+        { type: "車", side: "red", x: 0, y: 0 },
+        { type: "馬", side: "red", x: 1, y: 0 },
+        { type: "相", side: "red", x: 2, y: 0 },
+        { type: "仕", side: "red", x: 3, y: 0 },
+        { type: "帥", side: "red", x: 4, y: 0 },
+        { type: "仕", side: "red", x: 5, y: 0 },
+        { type: "相", side: "red", x: 6, y: 0 },
+        { type: "馬", side: "red", x: 7, y: 0 },
+        { type: "車", side: "red", x: 8, y: 0 },
+        { type: "炮", side: "red", x: 1, y: 2 },
+        { type: "炮", side: "red", x: 7, y: 2 },
+        { type: "兵", side: "red", x: 0, y: 3 },
+        { type: "兵", side: "red", x: 2, y: 3 },
+        { type: "兵", side: "red", x: 4, y: 3 },
+        { type: "兵", side: "red", x: 6, y: 3 },
+        { type: "兵", side: "red", x: 8, y: 3 },
+
+        // Black Pieces (Top, y: 6-9)
+        { type: "車", side: "black", x: 0, y: 9 },
+        { type: "馬", side: "black", x: 1, y: 9 },
+        { type: "象", side: "black", x: 2, y: 9 },
+        { type: "士", side: "black", x: 3, y: 9 },
+        { type: "將", side: "black", x: 4, y: 9 },
+        { type: "士", side: "black", x: 5, y: 9 },
+        { type: "象", side: "black", x: 6, y: 9 },
+        { type: "馬", side: "black", x: 7, y: 9 },
+        { type: "車", side: "black", x: 8, y: 9 },
+        { type: "炮", side: "black", x: 1, y: 7 },
+        { type: "炮", side: "black", x: 7, y: 7 },
+        { type: "卒", side: "black", x: 0, y: 6 },
+        { type: "卒", side: "black", x: 2, y: 6 },
+        { type: "卒", side: "black", x: 4, y: 6 },
+        { type: "卒", side: "black", x: 6, y: 6 },
+        { type: "卒", side: "black", x: 8, y: 6 },
+      ];
+
+      // --- Canvas Texture Generators ---
+      function createWoodBackground(ctx, width, height, color1, color2) {
+        const grad = ctx.createLinearGradient(0, 0, width, height);
+        grad.addColorStop(0, color1);
+        grad.addColorStop(1, color2);
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, width, height);
+
+        // Add subtle noise/grain
+        ctx.fillStyle = "rgba(0,0,0,0.03)";
+        for (let i = 0; i < width * height * 0.05; i++) {
+          const x = Math.random() * width;
+          const y = Math.random() * height;
+          ctx.fillRect(x, y, 1, 2);
+        }
+      }
+
+      function generateBoardTexture() {
+        const canvas = document.createElement("canvas");
+        const C_SIZE = 100; // Size of one grid cell in pixels
+        const PAD = 60;
+        canvas.width = (BOARD_COLS - 1) * C_SIZE + PAD * 2; // 800 + 120 = 920
+        canvas.height = (BOARD_ROWS - 1) * C_SIZE + PAD * 2; // 900 + 120 = 1020
+        const ctx = canvas.getContext("2d");
+
+        createWoodBackground(
+          ctx,
+          canvas.width,
+          canvas.height,
+          "#e6b981",
+          "#cda066",
+        );
+
+        ctx.beginPath();
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = "#4a2f1d";
+
+        const startX = PAD;
+        const endX = canvas.width - PAD;
+        const startY = PAD;
+        const endY = canvas.height - PAD;
+
+        // Horizontal lines
+        for (let i = 0; i < BOARD_ROWS; i++) {
+          const y = PAD + i * C_SIZE;
+          ctx.moveTo(startX, y);
+          ctx.lineTo(endX, y);
+        }
+
+        // Vertical lines
+        for (let i = 0; i < BOARD_COLS; i++) {
+          const x = PAD + i * C_SIZE;
+          if (i === 0 || i === BOARD_COLS - 1) {
+            // Outer edges go all the way
+            ctx.moveTo(x, startY);
+            ctx.lineTo(x, endY);
+          } else {
+            // Inner lines break at the river
+            ctx.moveTo(x, startY);
+            ctx.lineTo(x, PAD + 4 * C_SIZE);
+            ctx.moveTo(x, PAD + 5 * C_SIZE);
+            ctx.lineTo(x, endY);
+          }
+        }
+
+        // Palace Diagonals (Red - Bottom)
+        ctx.moveTo(PAD + 3 * C_SIZE, endY);
+        ctx.lineTo(PAD + 5 * C_SIZE, endY - 2 * C_SIZE);
+        ctx.moveTo(PAD + 5 * C_SIZE, endY);
+        ctx.lineTo(PAD + 3 * C_SIZE, endY - 2 * C_SIZE);
+
+        // Palace Diagonals (Black - Top)
+        ctx.moveTo(PAD + 3 * C_SIZE, startY);
+        ctx.lineTo(PAD + 5 * C_SIZE, startY + 2 * C_SIZE);
+        ctx.moveTo(PAD + 5 * C_SIZE, startY);
+        ctx.lineTo(PAD + 3 * C_SIZE, startY + 2 * C_SIZE);
+
+        ctx.stroke();
+
+        // River Text
+        ctx.fillStyle = "#4a2f1d";
+        ctx.font =
+          'bold 48px "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif';
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+
+        // Draw rotated text for river
+        ctx.save();
+        ctx.translate(PAD + 2 * C_SIZE, PAD + 4.5 * C_SIZE);
+        ctx.rotate(-Math.PI / 2);
+        ctx.fillText("楚  河", 0, 0);
+        ctx.restore();
+
+        ctx.save();
+        ctx.translate(PAD + 6 * C_SIZE, PAD + 4.5 * C_SIZE);
+        ctx.rotate(Math.PI / 2);
+        ctx.fillText("漢  界", 0, 0);
+        ctx.restore();
+
+        // Corner marks helper
+        const drawMark = (cx, cy) => {
+          const s = 15; // length
+          const d = 5; // offset
+          ctx.beginPath();
+          ctx.lineWidth = 2;
+          // top left
+          if (cx > startX) {
+            ctx.moveTo(cx - d - s, cy - d);
+            ctx.lineTo(cx - d, cy - d);
+            ctx.lineTo(cx - d, cy - d - s);
+          }
+          // top right
+          if (cx < endX) {
+            ctx.moveTo(cx + d + s, cy - d);
+            ctx.lineTo(cx + d, cy - d);
+            ctx.lineTo(cx + d, cy - d - s);
+          }
+          // bottom left
+          if (cx > startX) {
+            ctx.moveTo(cx - d - s, cy + d);
+            ctx.lineTo(cx - d, cy + d);
+            ctx.lineTo(cx - d, cy + d + s);
+          }
+          // bottom right
+          if (cx < endX) {
+            ctx.moveTo(cx + d + s, cy + d);
+            ctx.lineTo(cx + d, cy + d);
+            ctx.lineTo(cx + d, cy + d + s);
+          }
+          ctx.stroke();
+        };
+
+        // Draw marks for Cannons & Pawns
+        const markPositions = [
+          { x: 1, y: 2 },
+          { x: 7, y: 2 },
+          { x: 1, y: 7 },
+          { x: 7, y: 7 }, // Cannons
+          { x: 0, y: 3 },
+          { x: 2, y: 3 },
+          { x: 4, y: 3 },
+          { x: 6, y: 3 },
+          { x: 8, y: 3 }, // Red Pawns
+          { x: 0, y: 6 },
+          { x: 2, y: 6 },
+          { x: 4, y: 6 },
+          { x: 6, y: 6 },
+          { x: 8, y: 6 }, // Black Pawns
+        ];
+
+        markPositions.forEach((p) => {
+          drawMark(PAD + p.x * C_SIZE, PAD + p.y * C_SIZE);
+        });
+
+        const tex = new THREE.CanvasTexture(canvas);
+        tex.colorSpace = THREE.SRGBColorSpace;
+        tex.anisotropy = 16;
+        return tex;
+      }
+
+      const pieceTextureCache = {};
+      function getPieceTexture(type, side) {
+        const key = `${type}-${side}`;
+        if (pieceTextureCache[key]) return pieceTextureCache[key];
+
+        const canvas = document.createElement("canvas");
+        canvas.width = 256;
+        canvas.height = 256;
+        const ctx = canvas.getContext("2d");
+
+        createWoodBackground(ctx, 256, 256, "#f3d5a2", "#dfb87f");
+
+        const isRed = side === "red";
+        const color = isRed ? "#b32400" : "#1a1a1a";
+
+        // Outer carving
+        ctx.beginPath();
+        ctx.arc(128, 128, 115, 0, Math.PI * 2);
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = "rgba(0,0,0,0.3)";
+        ctx.stroke();
+
+        // Inner colored ring
+        ctx.beginPath();
+        ctx.arc(128, 128, 90, 0, Math.PI * 2);
+        ctx.lineWidth = 6;
+        ctx.strokeStyle = color;
+        ctx.stroke();
+
+        // Text
+        ctx.save();
+        ctx.translate(128, 128);
+        ctx.rotate(-Math.PI / 2); // Rotate -90deg to fix sideways text mapping
+
+        ctx.fillStyle = color;
+        ctx.font =
+          'bold 100px "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif';
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        // Slight shadow for depth
+        ctx.shadowColor = "rgba(0,0,0,0.3)";
+        ctx.shadowBlur = 4;
+        ctx.shadowOffsetY = 2;
+        ctx.fillText(type, 0, 10); // Offset for baseline
+
+        ctx.restore();
+
+        const tex = new THREE.CanvasTexture(canvas);
+        tex.colorSpace = THREE.SRGBColorSpace;
+        pieceTextureCache[key] = tex;
+        return tex;
+      }
+
+      // --- Initialization ---
+      function init() {
+        // Scene & Camera
+        scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2("#1a1a1a", 0.003);
+
+        camera = new THREE.PerspectiveCamera(
+          45,
+          window.innerWidth / window.innerHeight,
+          1,
+          1000,
+        );
+        camera.position.set(0, 80, 100);
+
+        // Renderer
+        renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        document.body.appendChild(renderer.domElement);
+
+        // Controls
+        controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.maxPolarAngle = Math.PI / 2.2;
+        controls.minDistance = 30;
+        controls.maxDistance = 200;
+        // Lock camera azimuth so the user stays on the Red side roughly
+        controls.minAzimuthAngle = -Math.PI / 4;
+        controls.maxAzimuthAngle = Math.PI / 4;
+
+        // Lighting
+        const ambient = new THREE.AmbientLight(0xffffff, 0.4);
+        scene.add(ambient);
+
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+        dirLight.position.set(50, 100, 50);
+        dirLight.castShadow = true;
+        dirLight.shadow.mapSize.width = 2048;
+        dirLight.shadow.mapSize.height = 2048;
+        dirLight.shadow.camera.left = -60;
+        dirLight.shadow.camera.right = 60;
+        dirLight.shadow.camera.top = 60;
+        dirLight.shadow.camera.bottom = -60;
+        dirLight.shadow.bias = -0.001;
+        scene.add(dirLight);
+
+        const fillLight = new THREE.DirectionalLight(0xaaccff, 0.3);
+        fillLight.position.set(-50, 30, -50);
+        scene.add(fillLight);
+
+        buildBoard();
+        buildPieces();
+
+        // Interaction
+        window.addEventListener("resize", onWindowResize);
+        window.addEventListener("pointerdown", onPointerDown);
+
+        document.getElementById("loading").style.opacity = 0;
+        setTimeout(() => document.getElementById("loading").remove(), 500);
+
+        animate();
+      }
+
+      // --- Construction ---
+      function buildBoard() {
+        const boardW = (BOARD_COLS - 1) * SPACING + 12;
+        const boardH = (BOARD_ROWS - 1) * SPACING + 12;
+        const boardThickness = 3;
+
+        const geometry = new RoundedBoxGeometry(
+          boardW,
+          boardThickness,
+          boardH,
+          4,
+          1,
+        );
+
+        const topTex = generateBoardTexture();
+        const sideMat = new THREE.MeshStandardMaterial({
+          color: "#cda066",
+          roughness: 0.8,
+          metalness: 0.1,
+        });
+        const topMat = new THREE.MeshStandardMaterial({
+          map: topTex,
+          roughness: 0.7,
+          metalness: 0.05,
+        });
+
+        // BoxGeometry groups: right, left, top, bottom, front, back
+        const materials = [sideMat, sideMat, topMat, sideMat, sideMat, sideMat];
+
+        boardMesh = new THREE.Mesh(geometry, materials);
+        boardMesh.position.y = -boardThickness / 2;
+        boardMesh.receiveShadow = true;
+        boardMesh.castShadow = true;
+        scene.add(boardMesh);
+
+        // Invisible plane for accurate raycasting on the board surface
+        const planeGeo = new THREE.PlaneGeometry(boardW + 20, boardH + 20);
+        const planeMat = new THREE.MeshBasicMaterial({ visible: false });
+        boardMesh.raycastPlane = new THREE.Mesh(planeGeo, planeMat);
+        boardMesh.raycastPlane.rotation.x = -Math.PI / 2;
+        scene.add(boardMesh.raycastPlane);
+      }
+
+      function gridToWorld(gx, gy) {
+        // (0,0) is bottom left
+        const x = (gx - (BOARD_COLS - 1) / 2) * SPACING;
+        const z = ((BOARD_ROWS - 1) / 2 - gy) * SPACING;
+        return { x, z };
+      }
+
+      function worldToGrid(wx, wz) {
+        const gx = Math.round(wx / SPACING + (BOARD_COLS - 1) / 2);
+        const gy = Math.round((BOARD_ROWS - 1) / 2 - wz / SPACING);
+        return { gx, gy };
+      }
+
+      function buildPieces() {
+        const pieceGeo = new THREE.CylinderGeometry(4.2, 4.5, 1.8, 32);
+
+        INITIAL_SETUP.forEach((data) => {
+          const tex = getPieceTexture(data.type, data.side);
+
+          const topMat = new THREE.MeshStandardMaterial({
+            map: tex,
+            roughness: 0.5,
+            metalness: 0.1,
+          });
+          const sideMat = new THREE.MeshStandardMaterial({
+            color: "#dfb87f",
+            roughness: 0.6,
+          });
+          const botMat = new THREE.MeshStandardMaterial({ color: "#d5ae77" });
+
+          // Cylinder faces: side, top, bottom
+          const mesh = new THREE.Mesh(pieceGeo, [sideMat, topMat, botMat]);
+
+          const pos = gridToWorld(data.x, data.y);
+          mesh.position.set(pos.x, 0.9, pos.z); // y is half thickness
+          mesh.castShadow = true;
+          mesh.receiveShadow = true;
+
+          // Add game state info to mesh
+          mesh.userData = {
+            type: data.type,
+            side: data.side,
+            gx: data.x,
+            gy: data.y,
+            targetPos: new THREE.Vector3(pos.x, 0.9, pos.z),
+            originalY: 0.9,
+            isAnimating: false,
+          };
+
+          pieces.push(mesh);
+          scene.add(mesh);
+
+          // Pure logical state for AI (Decoupled from render logic)
+          logicalState[data.y][data.x] = {
+            type: data.type,
+            side: data.side,
+            mesh: mesh,
+          };
+        });
+      }
+
+      // --- Logic & AI ---
+      function getPieceMoves(state, x, y) {
+        const piece = state[y][x];
+        const moves = [];
+        if (!piece) return moves;
+
+        const isRed = piece.side === "red";
+        const dir = isRed ? 1 : -1;
+
+        const addIfValid = (tx, ty) => {
+          if (tx >= 0 && tx < BOARD_COLS && ty >= 0 && ty < BOARD_ROWS) {
+            const target = state[ty][tx];
+            if (!target || target.side !== piece.side) {
+              moves.push({ sx: x, sy: y, tx, ty });
+            }
+          }
+        };
+
+        if (piece.type === "車") {
+          const dirs = [
+            [0, 1],
+            [0, -1],
+            [1, 0],
+            [-1, 0],
+          ];
+          for (let [dx, dy] of dirs) {
+            let cx = x + dx,
+              cy = y + dy;
+            while (cx >= 0 && cx < BOARD_COLS && cy >= 0 && cy < BOARD_ROWS) {
+              if (!state[cy][cx]) {
+                moves.push({ sx: x, sy: y, tx: cx, ty: cy });
+              } else {
+                if (state[cy][cx].side !== piece.side)
+                  moves.push({ sx: x, sy: y, tx: cx, ty: cy });
+                break;
+              }
+              cx += dx;
+              cy += dy;
+            }
+          }
+        } else if (piece.type === "炮") {
+          const dirs = [
+            [0, 1],
+            [0, -1],
+            [1, 0],
+            [-1, 0],
+          ];
+          for (let [dx, dy] of dirs) {
+            let cx = x + dx,
+              cy = y + dy;
+            let jumped = false;
+            while (cx >= 0 && cx < BOARD_COLS && cy >= 0 && cy < BOARD_ROWS) {
+              const target = state[cy][cx];
+              if (!jumped) {
+                if (!target) moves.push({ sx: x, sy: y, tx: cx, ty: cy });
+                else jumped = true;
+              } else {
+                if (target) {
+                  if (target.side !== piece.side)
+                    moves.push({ sx: x, sy: y, tx: cx, ty: cy });
+                  break;
+                }
+              }
+              cx += dx;
+              cy += dy;
+            }
+          }
+        } else if (piece.type === "馬") {
+          const offsets = [
+            [1, 2],
+            [2, 1],
+            [2, -1],
+            [1, -2],
+            [-1, -2],
+            [-2, -1],
+            [-2, 1],
+            [-1, 2],
+          ];
+          for (let [dx, dy] of offsets) {
+            const bx = x + (Math.abs(dx) === 2 ? Math.sign(dx) : 0);
+            const by = y + (Math.abs(dy) === 2 ? Math.sign(dy) : 0);
+            if (
+              bx >= 0 &&
+              bx < BOARD_COLS &&
+              by >= 0 &&
+              by < BOARD_ROWS &&
+              !state[by][bx]
+            ) {
+              addIfValid(x + dx, y + dy);
+            }
+          }
+        } else if (piece.type === "象" || piece.type === "相") {
+          const offsets = [
+            [2, 2],
+            [2, -2],
+            [-2, -2],
+            [-2, 2],
+          ];
+          for (let [dx, dy] of offsets) {
+            const tx = x + dx,
+              ty = y + dy;
+            if (isRed && ty > 4) continue;
+            if (!isRed && ty < 5) continue;
+            const bx = x + dx / 2,
+              by = y + dy / 2;
+            if (
+              bx >= 0 &&
+              bx < BOARD_COLS &&
+              by >= 0 &&
+              by < BOARD_ROWS &&
+              !state[by][bx]
+            ) {
+              addIfValid(tx, ty);
+            }
+          }
+        } else if (piece.type === "士" || piece.type === "仕") {
+          const offsets = [
+            [1, 1],
+            [1, -1],
+            [-1, -1],
+            [-1, 1],
+          ];
+          for (let [dx, dy] of offsets) {
+            const tx = x + dx,
+              ty = y + dy;
+            if (tx >= 3 && tx <= 5) {
+              if (isRed && ty >= 0 && ty <= 2) addIfValid(tx, ty);
+              else if (!isRed && ty >= 7 && ty <= 9) addIfValid(tx, ty);
+            }
+          }
+        } else if (piece.type === "帥" || piece.type === "將") {
+          const offsets = [
+            [0, 1],
+            [0, -1],
+            [1, 0],
+            [-1, 0],
+          ];
+          for (let [dx, dy] of offsets) {
+            const tx = x + dx,
+              ty = y + dy;
+            if (tx >= 3 && tx <= 5) {
+              if (isRed && ty >= 0 && ty <= 2) addIfValid(tx, ty);
+              else if (!isRed && ty >= 7 && ty <= 9) addIfValid(tx, ty);
+            }
+          }
+        } else if (piece.type === "兵" || piece.type === "卒") {
+          addIfValid(x, y + dir);
+          const crossed = isRed ? y > 4 : y < 5;
+          if (crossed) {
+            addIfValid(x + 1, y);
+            addIfValid(x - 1, y);
+          }
+        }
+
+        return moves;
+      }
+
+      function checkGeneralsFacing(state) {
+        let rx = -1,
+          ry = -1,
+          bx = -1,
+          by = -1;
+        for (let y = 0; y < BOARD_ROWS; y++) {
+          for (let x = 3; x <= 5; x++) {
+            if (state[y][x]) {
+              if (state[y][x].type === "帥") {
+                rx = x;
+                ry = y;
+              }
+              if (state[y][x].type === "將") {
+                bx = x;
+                by = y;
+              }
+            }
+          }
+        }
+        if (rx === -1 || bx === -1 || rx !== bx) return false;
+
+        const minY = Math.min(ry, by);
+        const maxY = Math.max(ry, by);
+        for (let y = minY + 1; y < maxY; y++) {
+          if (state[y][rx] !== null) return false;
+        }
+        return true;
+      }
+
+      function getAllMoves(state, side) {
+        let moves = [];
+        for (let y = 0; y < BOARD_ROWS; y++) {
+          for (let x = 0; x < BOARD_COLS; x++) {
+            if (state[y][x] && state[y][x].side === side) {
+              moves.push(...getPieceMoves(state, x, y));
+            }
+          }
+        }
+        return moves.filter((m) => {
+          const temp = state[m.ty][m.tx];
+          state[m.ty][m.tx] = state[m.sy][m.sx];
+          state[m.sy][m.sx] = null;
+          const facing = checkGeneralsFacing(state);
+          state[m.sy][m.sx] = state[m.ty][m.tx];
+          state[m.ty][m.tx] = temp;
+          return !facing;
+        });
+      }
+
+      // Piece Values for Evaluation
+      const PIECE_VALUES = {
+        帥: 10000,
+        將: 10000,
+        車: 900,
+        炮: 450,
+        馬: 400,
+        相: 200,
+        象: 200,
+        仕: 200,
+        士: 200,
+        兵: 100,
+        卒: 100,
+      };
+
+      function evaluateState(state) {
+        let score = 0;
+        let redKing = false,
+          blackKing = false;
+        for (let y = 0; y < BOARD_ROWS; y++) {
+          for (let x = 0; x < BOARD_COLS; x++) {
+            const p = state[y][x];
+            if (!p) continue;
+
+            if (p.type === "帥") redKing = true;
+            if (p.type === "將") blackKing = true;
+
+            let val = PIECE_VALUES[p.type];
+            // Positional Bonuses
+            if (p.type === "兵" && y > 4) val += 50 + y * 5;
+            if (p.type === "卒" && y < 5) val += 50 + (9 - y) * 5;
+            if (p.type === "馬") val += (4.5 - Math.abs(x - 4.5)) * 10;
+
+            if (p.side === "black") score += val;
+            else score -= val;
+          }
+        }
+        // Extreme penalties for missing King to guide AI away from self-check
+        if (!redKing) return 100000;
+        if (!blackKing) return -100000;
+        return score;
+      }
+
+      // Alpha-Beta Minimax
+      function minimax(state, depth, alpha, beta, isMaximizing) {
+        if (depth === 0) return evaluateState(state);
+
+        const side = isMaximizing ? "black" : "red";
+        const moves = getAllMoves(state, side);
+
+        if (moves.length === 0) return isMaximizing ? -100000 : 100000;
+
+        if (isMaximizing) {
+          let maxEval = -Infinity;
+          for (let m of moves) {
+            const temp = state[m.ty][m.tx];
+            state[m.ty][m.tx] = state[m.sy][m.sx];
+            state[m.sy][m.sx] = null;
+            let ev = minimax(state, depth - 1, alpha, beta, false);
+            state[m.sy][m.sx] = state[m.ty][m.tx];
+            state[m.ty][m.tx] = temp;
+
+            maxEval = Math.max(maxEval, ev);
+            alpha = Math.max(alpha, ev);
+            if (beta <= alpha) break; // Beta cutoff
+          }
+          return maxEval;
+        } else {
+          let minEval = Infinity;
+          for (let m of moves) {
+            const temp = state[m.ty][m.tx];
+            state[m.ty][m.tx] = state[m.sy][m.sx];
+            state[m.sy][m.sx] = null;
+            let ev = minimax(state, depth - 1, alpha, beta, true);
+            state[m.sy][m.sx] = state[m.ty][m.tx];
+            state[m.ty][m.tx] = temp;
+
+            minEval = Math.min(minEval, ev);
+            beta = Math.min(beta, ev);
+            if (beta <= alpha) break; // Alpha cutoff
+          }
+          return minEval;
+        }
+      }
+
+      function makeAIMove() {
+        isAIACTIVE = true;
+        updateUI("AI is thinking...", "black-turn");
+
+        // Timeout allows the UI to visually update before blocking standard JS thread for processing
+        setTimeout(() => {
+          const moves = getAllMoves(logicalState, "black");
+          if (moves.length === 0) {
+            updateUI("Red Wins! Checkmate.", "red-turn");
+            return;
+          }
+
+          let bestMove = null;
+          let bestValue = -Infinity;
+          let alpha = -Infinity;
+          let beta = Infinity;
+
+          // Shuffle moves to add variance among similarly evaluated paths
+          moves.sort(() => Math.random() - 0.5);
+
+          for (let m of moves) {
+            const temp = logicalState[m.ty][m.tx];
+            logicalState[m.ty][m.tx] = logicalState[m.sy][m.sx];
+            logicalState[m.sy][m.sx] = null;
+
+            // Depth 2 for swift browser performance
+            let moveValue = minimax(logicalState, 2, alpha, beta, false);
+
+            logicalState[m.sy][m.sx] = logicalState[m.ty][m.tx];
+            logicalState[m.ty][m.tx] = temp;
+
+            if (moveValue > bestValue) {
+              bestValue = moveValue;
+              bestMove = m;
+            }
+            alpha = Math.max(alpha, moveValue);
+          }
+
+          if (bestMove) {
+            executeActualMove(
+              bestMove.sx,
+              bestMove.sy,
+              bestMove.tx,
+              bestMove.ty,
+            );
+            isRedTurn = true;
+            isAIACTIVE = false;
+
+            // Check if Red is mated
+            if (getAllMoves(logicalState, "red").length === 0) {
+              updateUI("AI Wins! Checkmate.", "black-turn");
+              isAIACTIVE = true; // Lock the game
+            } else {
+              updateUI("Red's Turn", "red-turn");
+            }
+          }
+        }, 50);
+      }
+
+      function executeActualMove(sx, sy, tx, ty) {
+        const pieceData = logicalState[sy][sx];
+        const targetData = logicalState[ty][tx];
+
+        logicalState[sy][sx] = null;
+        logicalState[ty][tx] = pieceData;
+
+        const mesh = pieceData.mesh;
+        mesh.userData.gx = tx;
+        mesh.userData.gy = ty;
+
+        const wPos = gridToWorld(tx, ty);
+        mesh.userData.targetPos.set(wPos.x, mesh.userData.originalY, wPos.z);
+        mesh.userData.isAnimating = true;
+
+        if (targetData) {
+          const tMesh = targetData.mesh;
+          scene.remove(tMesh);
+          const idx = pieces.indexOf(tMesh);
+          if (idx > -1) pieces.splice(idx, 1);
+        }
+      }
+
+      // --- Interaction ---
+      function selectPiece(piece) {
+        if (selectedPiece) {
+          selectedPiece.position.y = selectedPiece.userData.originalY;
+          selectedPiece.userData.targetPos.y = selectedPiece.userData.originalY;
+        }
+        selectedPiece = piece;
+        selectedPiece.userData.targetPos.y =
+          selectedPiece.userData.originalY + 2;
+        selectedPiece.userData.isAnimating = true;
+      }
+
+      function deselectPiece() {
+        if (selectedPiece) {
+          selectedPiece.userData.targetPos.y = selectedPiece.userData.originalY;
+          selectedPiece.userData.isAnimating = true;
+          selectedPiece = null;
+        }
+      }
+
+      function updateUI(text, className) {
+        const indicator = document.getElementById("turn-indicator");
+        if (text) {
+          indicator.textContent = text;
+          indicator.className = className;
+        } else {
+          if (isRedTurn) {
+            indicator.textContent = "Red's Turn";
+            indicator.className = "red-turn";
+          } else {
+            indicator.textContent = "Black's Turn";
+            indicator.className = "black-turn";
+          }
+        }
+      }
+
+      function onPointerDown(event) {
+        // Reject clicking input during AI turns
+        if (!isRedTurn || isAIACTIVE) return;
+
+        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+        raycaster.setFromCamera(mouse, camera);
+
+        const pieceIntersects = raycaster.intersectObjects(pieces);
+        if (pieceIntersects.length > 0) {
+          const clickedPiece = pieceIntersects[0].object;
+
+          // Allow human to only select Red pieces
+          if (clickedPiece.userData.side === "red") {
+            selectPiece(clickedPiece);
+            return;
+          }
+
+          // Attempt Capture
+          if (selectedPiece) {
+            const sx = selectedPiece.userData.gx;
+            const sy = selectedPiece.userData.gy;
+            const tx = clickedPiece.userData.gx;
+            const ty = clickedPiece.userData.gy;
+
+            const validMoves = getAllMoves(logicalState, "red");
+            if (
+              validMoves.some(
+                (m) => m.sx === sx && m.sy === sy && m.tx === tx && m.ty === ty,
+              )
+            ) {
+              executeActualMove(sx, sy, tx, ty);
+              deselectPiece();
+              isRedTurn = false;
+              updateUI("AI is thinking...", "black-turn");
+              makeAIMove();
+              return;
+            }
+          }
+        }
+
+        // Attempt Empty Board Move
+        if (selectedPiece) {
+          const planeIntersects = raycaster.intersectObject(
+            boardMesh.raycastPlane,
+          );
+          if (planeIntersects.length > 0) {
+            const point = planeIntersects[0].point;
+            const { gx, gy } = worldToGrid(point.x, point.z);
+
+            const sx = selectedPiece.userData.gx;
+            const sy = selectedPiece.userData.gy;
+
+            const validMoves = getAllMoves(logicalState, "red");
+            if (
+              validMoves.some(
+                (m) => m.sx === sx && m.sy === sy && m.tx === gx && m.ty === gy,
+              )
+            ) {
+              executeActualMove(sx, sy, gx, gy);
+              deselectPiece();
+              isRedTurn = false;
+              updateUI("AI is thinking...", "black-turn");
+              makeAIMove();
+              return;
+            }
+          }
+          deselectPiece(); // Canceled if invalid click
+        }
+      }
+
+      function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      }
+
+      // --- Animation Loop ---
+      const clock = new THREE.Clock();
+
+      function animate() {
+        requestAnimationFrame(animate);
+
+        const delta = clock.getDelta();
+
+        pieces.forEach((p) => {
+          if (p.userData.isAnimating) {
+            p.position.lerp(p.userData.targetPos, 10 * delta);
+            if (p.position.distanceTo(p.userData.targetPos) < 0.05) {
+              p.position.copy(p.userData.targetPos);
+              p.userData.isAnimating = false;
+            }
+          }
+        });
+
+        controls.update();
+        renderer.render(scene, camera);
+      }
+
+      // Boot
+      init();
+    </script>
+  </body>
+</html>

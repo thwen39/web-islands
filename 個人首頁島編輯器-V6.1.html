@@ -1,0 +1,3584 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>3D 群島探索首頁與視覺化編輯器 v6</title>
+    <style>
+      /* =========================================
+       1. 全域變數與基礎版面設定
+       ========================================= */
+      :root {
+        --bg-glass: rgba(255, 255, 255, 0.88);
+        --primary: #2b9eb3;
+        --primary-hover: #218396;
+        --accent: #ff8c42;
+        --danger: #e65c5c;
+        --text-main: #1e293b;
+        --text-muted: #64748b;
+        --border-color: rgba(148, 163, 184, 0.35);
+        --shadow-soft: 0 10px 30px rgba(15, 23, 42, 0.14);
+        --radius-lg: 16px;
+        --radius-md: 10px;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        font-family:
+          "PingFang TC",
+          "Microsoft JhengHei",
+          -apple-system,
+          BlinkMacSystemFont,
+          sans-serif;
+      }
+
+      body,
+      html {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background-color: #7cc6fe;
+        color: var(--text-main);
+        user-select: none;
+      }
+
+      #canvas-container {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 1;
+      }
+
+      #loading-banner {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 30;
+        background: rgba(15, 23, 42, 0.88);
+        color: #fff;
+        padding: 16px 26px;
+        border-radius: 14px;
+        font-size: 0.95rem;
+        text-align: center;
+        box-shadow: var(--shadow-soft);
+        line-height: 1.6;
+      }
+
+      /* =========================================
+       2. 頂部懸浮導覽列
+       ========================================= */
+      .top-bar {
+        position: fixed;
+        top: 16px;
+        left: 16px;
+        right: 16px;
+        z-index: 20;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        pointer-events: none;
+      }
+
+      .glass-pill {
+        pointer-events: auto;
+        background: var(--bg-glass);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.75);
+        border-radius: 999px;
+        padding: 7px 16px;
+        box-shadow: var(--shadow-soft);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .site-brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .site-brand .logo-dot {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #4ade80, #2b9eb3);
+        box-shadow: 0 0 10px rgba(43, 158, 179, 0.5);
+      }
+
+      .site-title {
+        font-size: 1.02rem;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+        color: var(--text-main);
+      }
+
+      .site-subtitle {
+        font-size: 0.78rem;
+        color: var(--text-muted);
+        border-left: 1px solid var(--border-color);
+        padding-left: 10px;
+      }
+
+      .control-group {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 0.82rem;
+      }
+
+      .badge-label {
+        font-weight: 700;
+        color: var(--primary);
+        padding: 0 4px;
+        min-width: 62px;
+        text-align: center;
+      }
+
+      .btn-icon {
+        border: none;
+        background: rgba(241, 245, 249, 0.92);
+        color: var(--text-main);
+        padding: 5px 10px;
+        border-radius: 999px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .btn-icon:hover {
+        background: #e2e8f0;
+      }
+
+      .btn-icon.active {
+        background: var(--primary);
+        color: #fff;
+      }
+
+      .btn-icon.audio-on {
+        background: #10b981;
+        color: #fff;
+      }
+
+      .mode-switch-btn {
+        pointer-events: auto;
+        border: none;
+        background: linear-gradient(135deg, var(--primary), #1d7a8c);
+        color: white;
+        padding: 8px 16px;
+        border-radius: 999px;
+        font-size: 0.88rem;
+        font-weight: 700;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        box-shadow: 0 4px 12px rgba(43, 158, 179, 0.35);
+        transition:
+          transform 0.15s,
+          box-shadow 0.15s;
+      }
+
+      .mode-switch-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 16px rgba(43, 158, 179, 0.45);
+      }
+
+      .mode-switch-btn.editing {
+        background: linear-gradient(135deg, var(--accent), #e06d22);
+        box-shadow: 0 4px 12px rgba(255, 140, 66, 0.4);
+      }
+
+      /* =========================================
+       3. 島嶼懸浮標籤與訪客提示卡片
+       ========================================= */
+      #labels-layer {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 10;
+        overflow: hidden;
+      }
+
+      .island-label {
+        position: absolute;
+        transform: translate(-50%, -100%);
+        background: rgba(255, 255, 255, 0.92);
+        backdrop-filter: blur(6px);
+        padding: 4px 12px;
+        border-radius: 999px;
+        font-size: 0.82rem;
+        font-weight: 700;
+        color: var(--text-main);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+        border: 1px solid rgba(255, 255, 255, 0.95);
+        white-space: nowrap;
+        transition:
+          opacity 0.2s,
+          transform 0.15s,
+          border-color 0.2s;
+      }
+
+      .island-label.selected {
+        background: var(--accent);
+        color: #fff;
+        border-color: #fff;
+        transform: translate(-50%, -115%) scale(1.08);
+      }
+
+      #visitor-tooltip {
+        position: fixed;
+        bottom: 28px;
+        left: 50%;
+        transform: translateX(-50%) translateY(20px);
+        z-index: 18;
+        background: var(--bg-glass);
+        backdrop-filter: blur(14px);
+        border: 1px solid rgba(255, 255, 255, 0.85);
+        border-radius: var(--radius-lg);
+        padding: 14px 24px;
+        box-shadow: var(--shadow-soft);
+        text-align: center;
+        min-width: 260px;
+        max-width: 90vw;
+        opacity: 0;
+        pointer-events: none;
+        transition:
+          opacity 0.25s,
+          transform 0.25s;
+      }
+
+      #visitor-tooltip.visible {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+
+      #visitor-tooltip h3 {
+        font-size: 1.05rem;
+        color: var(--text-main);
+        margin-bottom: 4px;
+      }
+
+      #visitor-tooltip p {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        margin-bottom: 8px;
+      }
+
+      #visitor-tooltip .link-hint {
+        display: inline-block;
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: var(--primary);
+        background: rgba(43, 158, 179, 0.12);
+        padding: 3px 10px;
+        border-radius: 999px;
+      }
+
+      .controls-hint {
+        position: fixed;
+        bottom: 14px;
+        left: 18px;
+        z-index: 12;
+        font-size: 0.78rem;
+        color: rgba(255, 255, 255, 0.95);
+        text-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+        pointer-events: none;
+      }
+
+      /* =========================================
+       4. 右側編輯器側邊欄（管理者模式）
+       ========================================= */
+      #editor-panel {
+        position: fixed;
+        top: 74px;
+        right: 16px;
+        bottom: 16px;
+        width: 365px;
+        max-width: calc(100vw - 32px);
+        z-index: 25;
+        background: var(--bg-glass);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.85);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-soft);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        transform: translateX(calc(100% + 24px));
+        transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+      }
+
+      #editor-panel.open {
+        transform: translateX(0);
+      }
+
+      .editor-header {
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--border-color);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 6px;
+        background: rgba(255, 255, 255, 0.6);
+      }
+
+      .editor-header h2 {
+        font-size: 0.96rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+
+      .editor-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+
+      .editor-body::-webkit-scrollbar {
+        width: 6px;
+      }
+      .editor-body::-webkit-scrollbar-thumb {
+        background: rgba(148, 163, 184, 0.5);
+        border-radius: 3px;
+      }
+
+      .section-card {
+        background: rgba(255, 255, 255, 0.8);
+        border: 1px solid rgba(226, 232, 240, 0.95);
+        border-radius: var(--radius-md);
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 9px;
+      }
+
+      .section-title {
+        font-size: 0.84rem;
+        font-weight: 700;
+        color: var(--primary);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .island-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .island-chip {
+        border: 1px solid var(--border-color);
+        background: #fff;
+        color: var(--text-main);
+        padding: 5px 10px;
+        border-radius: 8px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.15s;
+      }
+
+      .island-chip.active {
+        background: var(--accent);
+        color: #fff;
+        border-color: var(--accent);
+      }
+
+      /* 已匯入自訂物件管理清單樣式 */
+      .custom-asset-list {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        margin-top: 2px;
+      }
+
+      .custom-asset-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 7px;
+        padding: 5px 8px;
+        font-size: 0.76rem;
+        color: var(--text-main);
+      }
+
+      .custom-asset-item span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        padding-right: 6px;
+      }
+
+      .btn-del-asset {
+        border: none;
+        background: rgba(230, 92, 92, 0.14);
+        color: var(--danger);
+        width: 22px;
+        height: 22px;
+        border-radius: 5px;
+        font-size: 0.74rem;
+        font-weight: 700;
+        cursor: pointer;
+        flex-shrink: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.15s;
+      }
+
+      .btn-del-asset:hover {
+        background: var(--danger);
+        color: #fff;
+      }
+
+      .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+
+      label {
+        font-size: 0.76rem;
+        font-weight: 600;
+        color: var(--text-muted);
+        display: flex;
+        justify-content: space-between;
+      }
+
+      input[type="text"],
+      input[type="url"],
+      select {
+        width: 100%;
+        padding: 7px 10px;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        font-size: 0.84rem;
+        background: #fff;
+        color: var(--text-main);
+        outline: none;
+        transition: border-color 0.2s;
+      }
+
+      input[type="text"]:focus,
+      input[type="url"]:focus,
+      select:focus {
+        border-color: var(--primary);
+      }
+
+      input[type="range"] {
+        width: 100%;
+        accent-color: var(--primary);
+        cursor: pointer;
+      }
+
+      input[type="color"] {
+        width: 100%;
+        height: 32px;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        padding: 2px;
+        background: #fff;
+        cursor: pointer;
+      }
+
+      .checkbox-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.8rem;
+        color: var(--text-main);
+        cursor: pointer;
+      }
+
+      .helper-note {
+        font-size: 0.74rem;
+        color: var(--text-muted);
+        line-height: 1.45;
+        background: rgba(241, 245, 249, 0.85);
+        padding: 7px 9px;
+        border-radius: 6px;
+      }
+
+      .btn {
+        border: none;
+        border-radius: 8px;
+        padding: 7px 11px;
+        font-size: 0.8rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.15s;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+      }
+
+      .btn-primary {
+        background: var(--primary);
+        color: #fff;
+      }
+      .btn-primary:hover {
+        background: var(--primary-hover);
+      }
+
+      .btn-outline {
+        background: #fff;
+        color: var(--text-main);
+        border: 1px solid #cbd5e1;
+      }
+      .btn-outline:hover {
+        background: #f8fafc;
+      }
+
+      .btn-danger {
+        background: rgba(230, 92, 92, 0.12);
+        color: var(--danger);
+      }
+      .btn-danger:hover {
+        background: var(--danger);
+        color: #fff;
+      }
+
+      .editor-footer {
+        padding: 11px 14px;
+        border-top: 1px solid var(--border-color);
+        background: rgba(255, 255, 255, 0.75);
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+      }
+
+      #toast {
+        position: fixed;
+        top: 76px;
+        left: 50%;
+        transform: translateX(-50%) translateY(-16px);
+        z-index: 50;
+        background: rgba(15, 23, 42, 0.92);
+        color: #fff;
+        padding: 8px 18px;
+        border-radius: 999px;
+        font-size: 0.84rem;
+        font-weight: 600;
+        opacity: 0;
+        pointer-events: none;
+        transition: all 0.25s;
+      }
+      #toast.show {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+
+      body.visitor-only-build #btn-toggle-mode,
+      body.visitor-only-build #editor-panel {
+        display: none !important;
+      }
+
+      @media (max-width: 768px) {
+        .site-subtitle {
+          display: none;
+        }
+        .top-bar {
+          top: 10px;
+          left: 10px;
+          right: 10px;
+        }
+        .glass-pill {
+          padding: 5px 10px;
+        }
+        #editor-panel {
+          top: auto;
+          bottom: 10px;
+          left: 10px;
+          right: 10px;
+          width: auto;
+          height: 55vh;
+          transform: translateY(calc(100% + 20px));
+        }
+        #editor-panel.open {
+          transform: translateY(0);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- 3D 渲染畫布 -->
+    <div id="canvas-container"></div>
+
+    <!-- 載入狀態提示 -->
+    <div id="loading-banner">🌊 正在初始化 3D 海洋世界與生態系統...</div>
+
+    <!-- 島嶼名稱懸浮標籤層 -->
+    <div id="labels-layer"></div>
+
+    <!-- 頂部懸浮導覽列 -->
+    <header class="top-bar">
+      <div class="glass-pill site-brand">
+        <span class="logo-dot"></span>
+        <span class="site-title" id="display-site-title">夢幻群島導航站</span>
+        <span class="site-subtitle" id="display-site-subtitle"
+          >點擊任意島嶼探索不同世界</span
+        >
+      </div>
+
+      <div
+        style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center"
+      >
+        <!-- 音效與動森風背景音樂控制 -->
+        <div class="glass-pill control-group">
+          <button
+            type="button"
+            class="btn-icon"
+            id="btn-toggle-waves"
+            title="開啟/關閉海浪環境聲"
+          >
+            🌊 海浪聲: 關
+          </button>
+          <button
+            type="button"
+            class="btn-icon"
+            id="btn-toggle-bgm"
+            title="開啟/關閉動森風輕快合成音樂"
+          >
+            🎵 島嶼音樂: 關
+          </button>
+        </div>
+
+        <!-- 日夜時間切換控制 -->
+        <div class="glass-pill control-group" id="time-controls-group">
+          <span class="badge-label" id="time-status-text">🕒 自動</span>
+          <button type="button" class="btn-icon active" data-time="auto">
+            自動
+          </button>
+          <button type="button" class="btn-icon" data-time="morning">
+            日出
+          </button>
+          <button type="button" class="btn-icon" data-time="noon">正午</button>
+          <button type="button" class="btn-icon" data-time="sunset">
+            黃昏
+          </button>
+          <button type="button" class="btn-icon" data-time="night">夜晚</button>
+        </div>
+
+        <!-- 視角重置按鈕 -->
+        <button
+          type="button"
+          class="glass-pill btn-icon"
+          id="btn-reset-camera"
+          style="padding: 8px 14px; font-weight: 700"
+          title="鏡頭飛回俯瞰全部群島"
+        >
+          🔭 全景
+        </button>
+
+        <!-- 訪客／編輯模式切換按鈕 -->
+        <button type="button" id="btn-toggle-mode" class="mode-switch-btn">
+          <span>🛠️ 進入編輯模式</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- 訪客模式懸停預覽卡 -->
+    <div id="visitor-tooltip">
+      <h3 id="tooltip-title">島嶼名稱</h3>
+      <p id="tooltip-desc">島嶼簡介說明文字</p>
+      <span class="link-hint" id="tooltip-url">點擊前往網站 ↗</span>
+    </div>
+
+    <!-- 操作提示 -->
+    <div class="controls-hint" id="controls-hint">
+      🖱️ 左鍵拖曳旋轉 ｜ 滾輪縮放 ｜ 點擊島嶼前往網頁
+    </div>
+
+    <!-- 系統提示氣泡 -->
+    <div id="toast">已儲存變更</div>
+
+    <!-- 右側管理者編輯器面板 -->
+    <aside id="editor-panel">
+      <div class="editor-header">
+        <h2>🏝️ 群島視覺化編輯器</h2>
+        <div style="display: flex; gap: 5px">
+          <button
+            type="button"
+            class="btn btn-outline"
+            id="btn-focus-overview"
+            style="padding: 5px 8px"
+            title="鏡頭退回俯瞰所有島嶼"
+          >
+            🔭 全景
+          </button>
+          <button
+            type="button"
+            class="btn btn-primary"
+            id="btn-add-island"
+            style="padding: 5px 10px"
+          >
+            ＋ 新增島嶼
+          </button>
+        </div>
+      </div>
+
+      <div class="editor-body">
+        <!-- 0. 網站首頁標題設定 -->
+        <div class="section-card">
+          <div class="section-title">🌐 首頁與海面細節設定</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>首頁主標題</label>
+              <input
+                type="text"
+                id="input-site-title"
+                placeholder="輸入你的網站名稱"
+              />
+            </div>
+            <div class="form-group">
+              <label>副標題提示</label>
+              <input
+                type="text"
+                id="input-site-subtitle"
+                placeholder="輸入導覽提示語"
+              />
+            </div>
+          </div>
+          <label class="checkbox-label">
+            <input type="checkbox" id="input-show-routes" checked />
+            顯示島嶼之間的虛線航道標記
+          </label>
+        </div>
+
+        <!-- 1. 選擇要編輯的島嶼 -->
+        <div class="section-card">
+          <div class="section-title">
+            <span>📍 點選島嶼（自動飛躍聚焦）</span>
+            <button
+              type="button"
+              class="btn btn-danger"
+              id="btn-delete-island"
+              style="padding: 3px 8px; font-size: 0.74rem"
+            >
+              刪除島嶼
+            </button>
+          </div>
+          <div class="island-chips" id="island-list-chips"></div>
+        </div>
+
+        <!-- 2. 島嶼基本資訊與連結 -->
+        <div class="section-card" id="island-props-card">
+          <div class="section-title">🔗 島嶼資訊與網頁連結</div>
+          <div class="form-group">
+            <label>島嶼名稱</label>
+            <input type="text" id="input-name" placeholder="例如：個人作品集" />
+          </div>
+          <div class="form-group">
+            <label>簡介說明（滑鼠移過時顯示）</label>
+            <input
+              type="text"
+              id="input-desc"
+              placeholder="例如：收錄我的設計與攝影作品"
+            />
+          </div>
+          <div class="form-group">
+            <label>目標網頁連結 (URL)</label>
+            <input
+              type="url"
+              id="input-url"
+              placeholder="https://example.com"
+            />
+          </div>
+          <label class="checkbox-label">
+            <input type="checkbox" id="input-newtab" checked />
+            點擊時在新分頁開啟網頁
+          </label>
+        </div>
+
+        <!-- 3. 六角形島嶼地形設定 -->
+        <div class="section-card">
+          <div class="section-title">⬡ 六角形地形與座標</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>左右位置 X <span id="val-x">0</span></label>
+              <input type="range" id="input-x" min="-28" max="28" step="0.5" />
+            </div>
+            <div class="form-group">
+              <label>前後位置 Z <span id="val-z">0</span></label>
+              <input type="range" id="input-z" min="-28" max="28" step="0.5" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>島嶼半徑大小 <span id="val-radius">3.2</span></label>
+              <input
+                type="range"
+                id="input-radius"
+                min="2.0"
+                max="6.0"
+                step="0.2"
+              />
+            </div>
+            <div class="form-group">
+              <label>島嶼海拔高度 <span id="val-height">1.2</span></label>
+              <input
+                type="range"
+                id="input-height"
+                min="0.6"
+                max="3.0"
+                step="0.1"
+              />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>地貌主題配色</label>
+              <select id="input-biome">
+                <option value="grass">🌿 翠綠草原</option>
+                <option value="sakura">🌸 粉紅櫻花林</option>
+                <option value="sand">🏖️ 陽光金沙灘</option>
+                <option value="snow">❄️ 極地白雪原</option>
+                <option value="autumn">🍁 楓紅秋日島</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>六角旋轉角度 <span id="val-hexrot">0°</span></label>
+              <input
+                type="range"
+                id="input-hexrot"
+                min="0"
+                max="330"
+                step="30"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. 建築物形狀、方向與位置 -->
+        <div class="section-card">
+          <div class="section-title">🏛️ 島上主建築設定</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>建築外觀形狀</label>
+              <select id="input-btype">
+                <optgroup label="內建低多邊形建築">
+                  <option value="lighthouse">🚨 海濱燈塔</option>
+                  <option value="cottage">🏡 溫馨小木屋</option>
+                  <option value="tower">🏢 現代摩天樓</option>
+                  <option value="castle">🏰 童話小城堡</option>
+                  <option value="windmill">🌬️ 荷蘭大風車</option>
+                  <option value="shrine">⛩️ 鳥居與神殿</option>
+                </optgroup>
+                <optgroup
+                  label="已匯入的自訂建築"
+                  id="custom-buildings-optgroup"
+                ></optgroup>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>建築主色調</label>
+              <input type="color" id="input-bcolor" value="#ff6b6b" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>建築朝向角度 <span id="val-brot">0°</span></label>
+              <input type="range" id="input-brot" min="0" max="360" step="15" />
+            </div>
+            <div class="form-group">
+              <label>建築縮放比例 <span id="val-bscale">1.0</span></label>
+              <input
+                type="range"
+                id="input-bscale"
+                min="0.4"
+                max="2.2"
+                step="0.1"
+              />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>島上左右偏移 <span id="val-bx">0</span></label>
+              <input
+                type="range"
+                id="input-bx"
+                min="-1.8"
+                max="1.8"
+                step="0.1"
+              />
+            </div>
+            <div class="form-group">
+              <label>島上前後偏移 <span id="val-bz">0</span></label>
+              <input
+                type="range"
+                id="input-bz"
+                min="-1.8"
+                max="1.8"
+                step="0.1"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- 5. 自然景觀物件 -->
+        <div class="section-card">
+          <div class="section-title">🌲 自然景觀裝飾</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>景觀生態風格</label>
+              <select id="input-nature">
+                <optgroup label="內建自然景觀">
+                  <option value="pine">🌲 針葉松樹林</option>
+                  <option value="palm">🌴 熱帶椰子樹</option>
+                  <option value="round">🌳 圓潤闊葉樹</option>
+                  <option value="rock">🪨 海岸巨石陣</option>
+                  <option value="none">🏜️ 無額外景觀</option>
+                </optgroup>
+                <optgroup
+                  label="已匯入的自訂景觀"
+                  id="custom-natures-optgroup"
+                ></optgroup>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>景觀豐富度 <span id="val-ncount">4</span></label>
+              <input type="range" id="input-ncount" min="0" max="8" step="1" />
+            </div>
+          </div>
+          <button
+            type="button"
+            class="btn btn-outline"
+            id="btn-reroll-nature"
+            style="width: 100%"
+          >
+            🎲 重新隨機擺放樹木與岩石
+          </button>
+        </div>
+
+        <!-- 6. 匯入與管理自訂 3D 物件擴充包 -->
+        <div class="section-card">
+          <div class="section-title">🧩 擴充與管理自訂 3D 物件</div>
+          <p class="helper-note">
+            匯入「<b>積木藍圖 (.json)</b
+            >」可擴充新建築與景觀；不需要的自訂物件可隨時從下方清單點擊
+            <b>✕</b> 刪除。
+          </p>
+          <div class="form-row">
+            <button
+              type="button"
+              class="btn btn-primary"
+              id="btn-import-custom-building"
+            >
+              🏛️ 匯入自訂建築
+            </button>
+            <button
+              type="button"
+              class="btn btn-primary"
+              id="btn-import-custom-nature"
+            >
+              🌿 匯入自訂景觀
+            </button>
+          </div>
+
+          <!-- 已匯入建築管理清單 -->
+          <div class="form-group">
+            <label>已匯入的自訂建築</label>
+            <div
+              class="custom-asset-list"
+              id="custom-buildings-manage-list"
+            ></div>
+          </div>
+
+          <!-- 已匯入景觀管理清單 -->
+          <div class="form-group">
+            <label>已匯入的自訂景觀</label>
+            <div
+              class="custom-asset-list"
+              id="custom-natures-manage-list"
+            ></div>
+          </div>
+
+          <button
+            type="button"
+            class="btn btn-outline"
+            id="btn-download-sample-asset"
+            style="width: 100%; font-size: 0.76rem"
+          >
+            📄 下載「積木藍圖範例 (.json)」(含太空火箭與巨型蘑菇)
+          </button>
+          <input
+            type="file"
+            id="file-import-asset"
+            accept=".json"
+            style="display: none"
+          />
+        </div>
+      </div>
+
+      <!-- 底部儲存與匯出區 -->
+      <div class="editor-footer">
+        <div class="form-row">
+          <button type="button" class="btn btn-outline" id="btn-export-json">
+            📤 匯出 JSON 備份
+          </button>
+          <button type="button" class="btn btn-outline" id="btn-import-json">
+            📥 匯入 JSON 設定
+          </button>
+          <input
+            type="file"
+            id="file-import-json"
+            accept=".json"
+            style="display: none"
+          />
+        </div>
+        <button
+          type="button"
+          class="btn btn-primary"
+          id="btn-export-html"
+          style="width: 100%"
+        >
+          🚀 一鍵匯出「獨立訪客版 HTML」
+        </button>
+        <button
+          type="button"
+          class="btn btn-danger"
+          id="btn-reset-default"
+          style="width: 100%; font-size: 0.74rem; padding: 5px"
+        >
+          還原預設示範群島
+        </button>
+      </div>
+    </aside>
+
+    <!-- 載入 Three.js 與 OrbitControls -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <script>
+      (function () {
+        const loadingBanner = document.getElementById("loading-banner");
+
+        /* =========================================================================
+         1. 預設資料結構（包含自訂擴充物件庫 customAssets）
+         ========================================================================= */
+        const STORAGE_KEY = "hex_archipelago_config_v6";
+
+        const DEFAULT_CONFIG = {
+          siteTitle: "夢幻群島導航站",
+          siteSubtitle: "點擊任意島嶼探索不同網頁世界",
+          showRoutes: true,
+          visitorOnly: false,
+          customAssets: {
+            buildings: {
+              "custom-observatory": {
+                id: "custom-observatory",
+                name: "🔭 星空天文台 (內建擴充)",
+                format: "blueprint",
+                parts: [
+                  {
+                    shape: "cylinder",
+                    args: [0.65, 0.75, 1.0, 8],
+                    pos: [0, 0.5, 0],
+                    colorRole: "white",
+                  },
+                  {
+                    shape: "sphere",
+                    args: [0.66, 8, 6],
+                    pos: [0, 1.0, 0],
+                    colorRole: "main",
+                  },
+                  {
+                    shape: "cylinder",
+                    args: [0.12, 0.15, 0.9, 6],
+                    pos: [0.35, 1.35, 0.25],
+                    rot: [0.3, 0, -0.7],
+                    colorRole: "dark",
+                  },
+                ],
+              },
+            },
+            natures: {
+              "custom-crystal": {
+                id: "custom-crystal",
+                name: "💎 發光水晶簇 (內建擴充)",
+                format: "blueprint",
+                parts: [
+                  {
+                    shape: "cone",
+                    args: [0.18, 0.85, 5],
+                    pos: [0, 0.42, 0],
+                    rot: [0.1, 0, 0.1],
+                    colorRole: "crystal",
+                  },
+                  {
+                    shape: "cone",
+                    args: [0.14, 0.6, 5],
+                    pos: [0.18, 0.28, 0.1],
+                    rot: [0.2, 0.4, -0.35],
+                    colorRole: "crystal",
+                  },
+                  {
+                    shape: "cone",
+                    args: [0.12, 0.5, 5],
+                    pos: [-0.15, 0.24, -0.08],
+                    rot: [-0.25, 0, 0.3],
+                    colorRole: "crystal",
+                  },
+                ],
+              },
+            },
+          },
+          islands: [
+            {
+              id: "isl-1",
+              name: "關於我・燈塔主島",
+              desc: "認識站長的故事、經歷與最新動態",
+              url: "https://example.com/about",
+              newTab: true,
+              x: 0,
+              z: 0,
+              radius: 3.8,
+              height: 1.4,
+              hexRot: 0,
+              biome: "grass",
+              buildingType: "lighthouse",
+              buildingColor: "#ef4444",
+              buildingRot: 30,
+              buildingScale: 1.1,
+              buildingX: -0.4,
+              buildingZ: -0.3,
+              natureType: "pine",
+              natureCount: 5,
+              natureSeed: 101,
+            },
+            {
+              id: "isl-2",
+              name: "設計作品集",
+              desc: "UI/UX 設計、插畫與 3D 實驗專案展示",
+              url: "https://example.com/portfolio",
+              newTab: true,
+              x: -9.5,
+              z: -5.5,
+              radius: 3.4,
+              height: 1.2,
+              hexRot: 30,
+              biome: "sakura",
+              buildingType: "castle",
+              buildingColor: "#f472b6",
+              buildingRot: 45,
+              buildingScale: 1.0,
+              buildingX: 0,
+              buildingZ: 0,
+              natureType: "round",
+              natureCount: 5,
+              natureSeed: 202,
+            },
+            {
+              id: "isl-3",
+              name: "技術筆記與部落格",
+              desc: "前端開發、創意程式與日常隨筆",
+              url: "https://example.com/blog",
+              newTab: true,
+              x: 9.5,
+              z: -4.5,
+              radius: 3.2,
+              height: 1.1,
+              hexRot: 60,
+              biome: "autumn",
+              buildingType: "cottage",
+              buildingColor: "#f59e0b",
+              buildingRot: -30,
+              buildingScale: 1.1,
+              buildingX: 0.2,
+              buildingZ: 0.2,
+              natureType: "pine",
+              natureCount: 4,
+              natureSeed: 303,
+            },
+            {
+              id: "isl-4",
+              name: "數位工具百寶箱",
+              desc: "親手製作的實用小工具與線上服務",
+              url: "https://example.com/tools",
+              newTab: true,
+              x: -7.5,
+              z: 7.5,
+              radius: 3.3,
+              height: 1.0,
+              hexRot: 0,
+              biome: "sand",
+              buildingType: "windmill",
+              buildingColor: "#38bdf8",
+              buildingRot: 15,
+              buildingScale: 1.0,
+              buildingX: 0,
+              buildingZ: -0.2,
+              natureType: "palm",
+              natureCount: 4,
+              natureSeed: 404,
+            },
+            {
+              id: "isl-5",
+              name: "靈感神社・留言板",
+              desc: "歡迎留下足跡或與我聯繫合作",
+              url: "https://example.com/contact",
+              newTab: true,
+              x: 8.0,
+              z: 7.0,
+              radius: 3.1,
+              height: 1.3,
+              hexRot: 30,
+              biome: "snow",
+              buildingType: "shrine",
+              buildingColor: "#dc2626",
+              buildingRot: -45,
+              buildingScale: 1.1,
+              buildingX: 0,
+              buildingZ: 0,
+              natureType: "custom-crystal",
+              natureCount: 4,
+              natureSeed: 505,
+            },
+          ],
+        };
+
+        const BIOME_COLORS = {
+          grass: {
+            top: 0x5ec576,
+            side: 0xc29b61,
+            sand: 0xf4e2a8,
+            tree: 0x2d8a4e,
+          },
+          sakura: {
+            top: 0xffb7c5,
+            side: 0xb5838d,
+            sand: 0xffe5ec,
+            tree: 0xff758f,
+          },
+          sand: {
+            top: 0xf6d365,
+            side: 0xd4a373,
+            sand: 0xfaedcd,
+            tree: 0x40916c,
+          },
+          snow: {
+            top: 0xf1f5f9,
+            side: 0x94a3b8,
+            sand: 0xe2e8f0,
+            tree: 0x475569,
+          },
+          autumn: {
+            top: 0xf9844a,
+            side: 0x9c6644,
+            sand: 0xf8edeb,
+            tree: 0xd62828,
+          },
+        };
+
+        let appConfig = loadConfig();
+        if (!appConfig.customAssets) {
+          appConfig.customAssets = JSON.parse(
+            JSON.stringify(DEFAULT_CONFIG.customAssets),
+          );
+        }
+        if (!appConfig.customAssets.buildings)
+          appConfig.customAssets.buildings = {};
+        if (!appConfig.customAssets.natures)
+          appConfig.customAssets.natures = {};
+
+        let isEditMode = false;
+        let selectedIslandId = appConfig.islands[0]
+          ? appConfig.islands[0].id
+          : null;
+        let hoveredIslandId = null;
+        let timeMode = "auto";
+
+        if (appConfig.visitorOnly) {
+          document.body.classList.add("visitor-only-build");
+        }
+
+        function loadConfig() {
+          const embeddedScript = document.getElementById(
+            "embedded-archipelago-data",
+          );
+          if (embeddedScript && embeddedScript.textContent.trim()) {
+            try {
+              return JSON.parse(embeddedScript.textContent);
+            } catch (e) {
+              console.warn("內嵌資料解析失敗", e);
+            }
+          }
+          try {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) return JSON.parse(saved);
+          } catch (e) {
+            console.warn("讀取本機存檔失敗", e);
+          }
+          return JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+        }
+
+        function saveConfig(showNotification) {
+          if (appConfig.visitorOnly) return;
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(appConfig));
+            if (showNotification) showToast("💾 已自動儲存至瀏覽器");
+          } catch (e) {
+            console.error("儲存失敗", e);
+          }
+        }
+
+        function showToast(msg) {
+          const toast = document.getElementById("toast");
+          toast.textContent = msg;
+          toast.classList.add("show");
+          clearTimeout(toast._timer);
+          toast._timer = setTimeout(function () {
+            toast.classList.remove("show");
+          }, 2800);
+        }
+
+        /* =========================================================================
+         2. 瀏覽器內建 Web Audio API 音效合成器（海浪聲 + 動森風格輕快旋律）
+         ========================================================================= */
+        const SoundEngine = {
+          ctx: null,
+          wavesOn: false,
+          bgmOn: false,
+          waveGain: null,
+          waveFilter: null,
+          bgmTimer: null,
+          stepIndex: 0,
+
+          initContext: function () {
+            if (!this.ctx) {
+              const AudioCtx = window.AudioContext || window.webkitAudioContext;
+              this.ctx = new AudioCtx();
+            }
+            if (this.ctx.state === "suspended") {
+              this.ctx.resume();
+            }
+          },
+
+          toggleWaves: function () {
+            this.initContext();
+            this.wavesOn = !this.wavesOn;
+            const btn = document.getElementById("btn-toggle-waves");
+
+            if (this.wavesOn) {
+              btn.textContent = "🌊 海浪聲: 開";
+              btn.classList.add("audio-on");
+              this.startWaves();
+            } else {
+              btn.textContent = "🌊 海浪聲: 關";
+              btn.classList.remove("audio-on");
+              if (this.waveGain) {
+                this.waveGain.gain.setTargetAtTime(
+                  0.0001,
+                  this.ctx.currentTime,
+                  0.3,
+                );
+              }
+            }
+          },
+
+          startWaves: function () {
+            if (!this.waveGain) {
+              const bufferSize = this.ctx.sampleRate * 4;
+              const buffer = this.ctx.createBuffer(
+                1,
+                bufferSize,
+                this.ctx.sampleRate,
+              );
+              const data = buffer.getChannelData(0);
+              let b0 = 0,
+                b1 = 0,
+                b2 = 0,
+                b3 = 0,
+                b4 = 0,
+                b5 = 0,
+                b6 = 0;
+              for (let i = 0; i < bufferSize; i++) {
+                const white = Math.random() * 2 - 1;
+                b0 = 0.99886 * b0 + white * 0.0555179;
+                b1 = 0.99332 * b1 + white * 0.0750759;
+                b2 = 0.969 * b2 + white * 0.153852;
+                b3 = 0.8665 * b3 + white * 0.3104856;
+                b4 = 0.55 * b4 + white * 0.5329522;
+                b5 = -0.7616 * b5 - white * 0.016898;
+                data[i] =
+                  (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.04;
+                b6 = white * 0.115926;
+              }
+
+              const noise = this.ctx.createBufferSource();
+              noise.buffer = buffer;
+              noise.loop = true;
+
+              this.waveFilter = this.ctx.createBiquadFilter();
+              this.waveFilter.type = "lowpass";
+              this.waveFilter.frequency.value = 380;
+
+              this.waveGain = this.ctx.createGain();
+              this.waveGain.gain.value = 0.0001;
+
+              const lfo = this.ctx.createOscillator();
+              lfo.frequency.value = 0.14;
+              const lfoGain = this.ctx.createGain();
+              lfoGain.gain.value = 180;
+              lfo.connect(lfoGain);
+              lfoGain.connect(this.waveFilter.frequency);
+
+              noise.connect(this.waveFilter);
+              this.waveFilter.connect(this.waveGain);
+              this.waveGain.connect(this.ctx.destination);
+
+              noise.start();
+              lfo.start();
+            }
+            this.waveGain.gain.setTargetAtTime(0.28, this.ctx.currentTime, 0.5);
+          },
+
+          toggleBgm: function () {
+            this.initContext();
+            this.bgmOn = !this.bgmOn;
+            const btn = document.getElementById("btn-toggle-bgm");
+
+            if (this.bgmOn) {
+              btn.textContent = "🎵 島嶼音樂: 開";
+              btn.classList.add("audio-on");
+              this.startBgm();
+            } else {
+              btn.textContent = "🎵 島嶼音樂: 關";
+              btn.classList.remove("audio-on");
+              clearInterval(this.bgmTimer);
+            }
+          },
+
+          playPluckNote: function (freq, duration, volume, isNight) {
+            if (!this.ctx || !this.bgmOn) return;
+            const now = this.ctx.currentTime;
+            const osc = this.ctx.createOscillator();
+            const subOsc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+
+            osc.type = isNight ? "sine" : "triangle";
+            osc.frequency.setValueAtTime(freq, now);
+
+            subOsc.type = "sine";
+            subOsc.frequency.setValueAtTime(freq * 2, now);
+
+            const subGain = this.ctx.createGain();
+            subGain.gain.setValueAtTime(volume * 0.25, now);
+            subGain.gain.exponentialRampToValueAtTime(
+              0.0001,
+              now + duration * 0.4,
+            );
+
+            gain.gain.setValueAtTime(0.001, now);
+            gain.gain.linearRampToValueAtTime(volume, now + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+            osc.connect(gain);
+            subOsc.connect(subGain);
+            subGain.connect(gain);
+            gain.connect(this.ctx.destination);
+
+            osc.start(now);
+            subOsc.start(now);
+            osc.stop(now + duration + 0.05);
+            subOsc.stop(now + duration + 0.05);
+          },
+
+          startBgm: function () {
+            clearInterval(this.bgmTimer);
+            const dayScale = [523.25, 587.33, 659.25, 783.99, 880.0, 1046.5];
+            const bassNotes = [261.63, 329.63, 349.23, 392.0];
+            const pattern = [0, 2, 4, -1, 3, 2, 1, 2, 4, 5, 4, -1, 2, 1, 0, -1];
+
+            this.bgmTimer = setInterval(() => {
+              if (!this.bgmOn) return;
+              const isNight = getResolvedTimeKey() === "night";
+              const step = this.stepIndex % pattern.length;
+
+              if (step % 4 === 0) {
+                const bassFreq =
+                  bassNotes[Math.floor(step / 4) % bassNotes.length] *
+                  (isNight ? 0.5 : 1);
+                this.playPluckNote(bassFreq, 0.9, 0.06, isNight);
+              }
+
+              const noteIdx = pattern[step];
+              if (noteIdx >= 0) {
+                const finalIdx =
+                  Math.random() < 0.25
+                    ? Math.floor(Math.random() * dayScale.length)
+                    : noteIdx;
+                const freq = dayScale[finalIdx] * (isNight ? 0.5 : 1);
+                this.playPluckNote(
+                  freq,
+                  isNight ? 0.75 : 0.45,
+                  isNight ? 0.05 : 0.075,
+                  isNight,
+                );
+              }
+
+              this.stepIndex++;
+            }, 340);
+          },
+        };
+
+        document
+          .getElementById("btn-toggle-waves")
+          .addEventListener("click", function () {
+            SoundEngine.toggleWaves();
+          });
+
+        document
+          .getElementById("btn-toggle-bgm")
+          .addEventListener("click", function () {
+            SoundEngine.toggleBgm();
+          });
+
+        /* =========================================================================
+         3. 檢查 Three.js 是否載入成功並建立 3D 場景
+         ========================================================================= */
+        if (typeof THREE === "undefined") {
+          loadingBanner.innerHTML =
+            '⚠️ 3D 引擎載入失敗<br><span style="font-size:0.82rem;color:#cbd5e1;">請確認電腦已連接網路，並按 F5 重新整理網頁。</span>';
+          return;
+        }
+
+        loadingBanner.style.display = "none";
+
+        const OVERVIEW_CAM_POS = new THREE.Vector3(0, 24, 34);
+        const OVERVIEW_TARGET = new THREE.Vector3(0, 0, 0);
+
+        const cameraAnim = {
+          active: false,
+          targetPos: new THREE.Vector3(),
+          targetLookAt: new THREE.Vector3(),
+        };
+
+        function flyToIsland(isl) {
+          if (!isl) return;
+          const dist = Math.max(8.5, isl.radius * 2.6);
+          cameraAnim.targetLookAt.set(isl.x, isl.height * 0.7, isl.z);
+          cameraAnim.targetPos.set(
+            isl.x + dist * 0.45,
+            isl.height + dist * 0.72,
+            isl.z + dist * 0.95,
+          );
+          cameraAnim.active = true;
+        }
+
+        function flyToOverview() {
+          cameraAnim.targetLookAt.copy(OVERVIEW_TARGET);
+          cameraAnim.targetPos.copy(OVERVIEW_CAM_POS);
+          cameraAnim.active = true;
+        }
+
+        document
+          .getElementById("btn-reset-camera")
+          .addEventListener("click", flyToOverview);
+        document
+          .getElementById("btn-focus-overview")
+          .addEventListener("click", flyToOverview);
+
+        const container = document.getElementById("canvas-container");
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x8ecae6, 0.0105);
+
+        const camera = new THREE.PerspectiveCamera(
+          45,
+          window.innerWidth / window.innerHeight,
+          0.1,
+          300,
+        );
+        camera.position.copy(OVERVIEW_CAM_POS);
+
+        const renderer = new THREE.WebGLRenderer({
+          antialias: true,
+          powerPreference: "high-performance",
+        });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.05;
+        container.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.06;
+        controls.maxPolarAngle = Math.PI / 2 - 0.06;
+        controls.minDistance = 6;
+        controls.maxDistance = 80;
+        controls.target.copy(OVERVIEW_TARGET);
+
+        controls.addEventListener("start", function () {
+          cameraAnim.active = false;
+        });
+
+        const hemiLight = new THREE.HemisphereLight(0xffffff, 0x3b82f6, 0.85);
+        scene.add(hemiLight);
+
+        const sunLight = new THREE.DirectionalLight(0xfffbeb, 1.8);
+        sunLight.position.set(25, 40, 20);
+        sunLight.castShadow = true;
+        sunLight.shadow.mapSize.width = 2048;
+        sunLight.shadow.mapSize.height = 2048;
+        sunLight.shadow.camera.near = 5;
+        sunLight.shadow.camera.far = 120;
+        const d = 40;
+        sunLight.shadow.camera.left = -d;
+        sunLight.shadow.camera.right = d;
+        sunLight.shadow.camera.top = d;
+        sunLight.shadow.camera.bottom = -d;
+        sunLight.shadow.bias = -0.0005;
+        scene.add(sunLight);
+
+        // 波浪海洋
+        const oceanGeo = new THREE.PlaneGeometry(240, 240, 72, 72);
+        oceanGeo.rotateX(-Math.PI / 2);
+        const oceanPosAttr = oceanGeo.attributes.position;
+        const oceanBaseY = new Float32Array(oceanPosAttr.count);
+        for (let i = 0; i < oceanPosAttr.count; i++) {
+          oceanBaseY[i] = (Math.random() - 0.5) * 0.15;
+        }
+
+        const oceanMat = new THREE.MeshStandardMaterial({
+          color: 0x1ca3ec,
+          roughness: 0.25,
+          metalness: 0.1,
+          flatShading: true,
+        });
+        const oceanMesh = new THREE.Mesh(oceanGeo, oceanMat);
+        oceanMesh.receiveShadow = true;
+        scene.add(oceanMesh);
+
+        // 漂浮白雲
+        const cloudsGroup = new THREE.Group();
+        const cloudMat = new THREE.MeshStandardMaterial({
+          color: 0xffffff,
+          roughness: 0.9,
+          flatShading: true,
+          transparent: true,
+          opacity: 0.88,
+        });
+        for (let i = 0; i < 12; i++) {
+          const cloud = new THREE.Group();
+          const puffs = 3 + Math.floor(Math.random() * 3);
+          for (let j = 0; j < puffs; j++) {
+            const geo = new THREE.DodecahedronGeometry(
+              1.2 + Math.random() * 1.1,
+              0,
+            );
+            const mesh = new THREE.Mesh(geo, cloudMat);
+            mesh.position.set(
+              j * 1.4 - puffs * 0.6,
+              (Math.random() - 0.5) * 0.4,
+              (Math.random() - 0.5) * 0.8,
+            );
+            cloud.add(mesh);
+          }
+          cloud.position.set(
+            (Math.random() - 0.5) * 90,
+            14 + Math.random() * 7,
+            (Math.random() - 0.5) * 90,
+          );
+          cloud.userData = { speed: 0.3 + Math.random() * 0.4 };
+          cloudsGroup.add(cloud);
+        }
+        scene.add(cloudsGroup);
+
+        /* =========================================================================
+         4. 海面生態（小帆船、跳躍海豚）與島際虛線航道
+         ========================================================================= */
+        const seaLifeGroup = new THREE.Group();
+        scene.add(seaLifeGroup);
+
+        function createSailboat(sailColor) {
+          const boat = new THREE.Group();
+          const hullMat = new THREE.MeshStandardMaterial({
+            color: 0x92400e,
+            flatShading: true,
+          });
+          const deckMat = new THREE.MeshStandardMaterial({
+            color: 0xfef3c7,
+            flatShading: true,
+          });
+          const sailMat = new THREE.MeshStandardMaterial({
+            color: sailColor,
+            flatShading: true,
+            side: THREE.DoubleSide,
+          });
+
+          const hull = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.45, 0.25, 0.35, 6),
+            hullMat,
+          );
+          hull.scale.set(0.8, 1, 2.2);
+          hull.position.y = 0.15;
+
+          const deck = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.4, 0.4, 0.08, 6),
+            deckMat,
+          );
+          deck.scale.set(0.75, 1, 2.1);
+          deck.position.y = 0.33;
+
+          const mast = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.03, 0.04, 1.45, 6),
+            hullMat,
+          );
+          mast.position.set(0, 0.95, 0.1);
+
+          const mainSail = new THREE.Mesh(
+            new THREE.ConeGeometry(0.55, 1.15, 3),
+            sailMat,
+          );
+          mainSail.position.set(0, 1.0, -0.22);
+          mainSail.rotation.y = Math.PI / 2;
+          mainSail.scale.set(1, 1, 0.15);
+
+          boat.add(hull, deck, mast, mainSail);
+          boat.traverse(function (c) {
+            if (c.isMesh) {
+              c.castShadow = true;
+              c.receiveShadow = true;
+            }
+          });
+          return boat;
+        }
+
+        const sailboats = [
+          {
+            mesh: createSailboat(0xffffff),
+            radiusX: 14.5,
+            radiusZ: 12.5,
+            speed: 0.14,
+            phase: 0,
+          },
+          {
+            mesh: createSailboat(0xff8c42),
+            radiusX: 18.0,
+            radiusZ: 15.5,
+            speed: -0.1,
+            phase: 2.5,
+          },
+        ];
+        sailboats.forEach(function (sb) {
+          seaLifeGroup.add(sb.mesh);
+        });
+
+        function createDolphin() {
+          const dolphin = new THREE.Group();
+          const bodyMat = new THREE.MeshStandardMaterial({
+            color: 0x38bdf8,
+            flatShading: true,
+            roughness: 0.3,
+          });
+          const bellyMat = new THREE.MeshStandardMaterial({
+            color: 0xe0f2fe,
+            flatShading: true,
+          });
+
+          const body = new THREE.Mesh(
+            new THREE.ConeGeometry(0.22, 1.1, 6),
+            bodyMat,
+          );
+          body.rotation.x = Math.PI / 2;
+
+          const nose = new THREE.Mesh(
+            new THREE.ConeGeometry(0.11, 0.4, 6),
+            bellyMat,
+          );
+          nose.rotation.x = Math.PI / 2;
+          nose.position.z = 0.65;
+
+          const fin = new THREE.Mesh(
+            new THREE.ConeGeometry(0.12, 0.32, 4),
+            bodyMat,
+          );
+          fin.position.set(0, 0.22, -0.05);
+          fin.rotation.x = -0.35;
+
+          const tail = new THREE.Mesh(
+            new THREE.BoxGeometry(0.45, 0.06, 0.25),
+            bodyMat,
+          );
+          tail.position.set(0, 0, -0.58);
+
+          dolphin.add(body, nose, fin, tail);
+          return dolphin;
+        }
+
+        const dolphins = [
+          {
+            mesh: createDolphin(),
+            centerX: -4.5,
+            centerZ: 1.5,
+            cycleOffset: 0,
+          },
+          {
+            mesh: createDolphin(),
+            centerX: 5.0,
+            centerZ: 2.0,
+            cycleOffset: 3.8,
+          },
+        ];
+        dolphins.forEach(function (d) {
+          seaLifeGroup.add(d.mesh);
+        });
+
+        const seaRoutesGroup = new THREE.Group();
+        scene.add(seaRoutesGroup);
+
+        function rebuildSeaRoutes() {
+          while (seaRoutesGroup.children.length > 0) {
+            seaRoutesGroup.remove(seaRoutesGroup.children[0]);
+          }
+          if (appConfig.showRoutes === false || appConfig.islands.length < 2)
+            return;
+
+          const nodes = appConfig.islands;
+          const visited = new Set([0]);
+          const lineMat = new THREE.LineDashedMaterial({
+            color: 0xffffff,
+            dashSize: 0.65,
+            gapSize: 0.45,
+            transparent: true,
+            opacity: 0.65,
+          });
+
+          while (visited.size < nodes.length) {
+            let bestFrom = -1;
+            let bestTo = -1;
+            let minDist = Infinity;
+
+            visited.forEach(function (fromIdx) {
+              for (let toIdx = 0; toIdx < nodes.length; toIdx++) {
+                if (visited.has(toIdx)) continue;
+                const d = Math.hypot(
+                  nodes[fromIdx].x - nodes[toIdx].x,
+                  nodes[fromIdx].z - nodes[toIdx].z,
+                );
+                if (d < minDist) {
+                  minDist = d;
+                  bestFrom = fromIdx;
+                  bestTo = toIdx;
+                }
+              }
+            });
+
+            if (bestTo !== -1) {
+              visited.add(bestTo);
+              const p1 = new THREE.Vector3(
+                nodes[bestFrom].x,
+                0.16,
+                nodes[bestFrom].z,
+              );
+              const p2 = new THREE.Vector3(
+                nodes[bestTo].x,
+                0.16,
+                nodes[bestTo].z,
+              );
+              const geo = new THREE.BufferGeometry().setFromPoints([p1, p2]);
+              const line = new THREE.Line(geo, lineMat);
+              line.computeLineDistances();
+              seaRoutesGroup.add(line);
+            } else {
+              break;
+            }
+          }
+        }
+
+        /* =========================================================================
+         5. 編輯器 UI 綁定與自訂物件匯入／刪除邏輯
+         ========================================================================= */
+        const btnToggleMode = document.getElementById("btn-toggle-mode");
+        const editorPanel = document.getElementById("editor-panel");
+        const controlsHint = document.getElementById("controls-hint");
+        const visitorTooltip = document.getElementById("visitor-tooltip");
+
+        btnToggleMode.addEventListener("click", function () {
+          isEditMode = !isEditMode;
+          if (isEditMode) {
+            btnToggleMode.classList.add("editing");
+            btnToggleMode.innerHTML = "<span>👁️ 返回訪客預覽</span>";
+            editorPanel.classList.add("open");
+            visitorTooltip.classList.remove("visible");
+            controlsHint.textContent =
+              "🛠️ 編輯模式：點選島嶼自動飛躍聚焦並調整細節";
+            if (!selectedIslandId && appConfig.islands.length > 0) {
+              selectedIslandId = appConfig.islands[0].id;
+            }
+            syncEditorUI();
+          } else {
+            btnToggleMode.classList.remove("editing");
+            btnToggleMode.innerHTML = "<span>🛠️ 進入編輯模式</span>";
+            editorPanel.classList.remove("open");
+            controlsHint.textContent =
+              "🖱️ 左鍵拖曳旋轉 ｜ 滾輪縮放 ｜ 點擊島嶼前往網頁";
+          }
+          updateSelectionVisuals();
+        });
+
+        const timeControlsGroup = document.getElementById(
+          "time-controls-group",
+        );
+        timeControlsGroup.querySelectorAll(".btn-icon").forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            timeControlsGroup
+              .querySelectorAll(".btn-icon")
+              .forEach(function (b) {
+                b.classList.remove("active");
+              });
+            btn.classList.add("active");
+            timeMode = btn.getAttribute("data-time");
+
+            const labels = {
+              auto: "🕒 自動",
+              morning: "🌅 日出",
+              noon: "☀️ 正午",
+              sunset: "🌇 黃昏",
+              night: "🌙 夜晚",
+            };
+            document.getElementById("time-status-text").textContent =
+              labels[timeMode];
+          });
+        });
+
+        function selectIsland(id, shouldFly) {
+          selectedIslandId = id;
+          syncEditorUI();
+          updateSelectionVisuals();
+          if (shouldFly !== false) {
+            const isl = appConfig.islands.find(function (i) {
+              return i.id === id;
+            });
+            if (isl) flyToIsland(isl);
+          }
+        }
+
+        // 刪除指定的自訂建築或自訂景觀
+        function deleteCustomAsset(category, assetKey) {
+          const assetMap =
+            appConfig.customAssets && appConfig.customAssets[category];
+          if (!assetMap || !assetMap[assetKey]) return;
+
+          const assetName = assetMap[assetKey].name || assetKey;
+          if (
+            !confirm(
+              "確定要刪除自訂物件「" +
+                assetName +
+                "」嗎？\n（若目前有島嶼正在使用此物件，將會自動切換回預設外觀）",
+            )
+          ) {
+            return;
+          }
+
+          delete assetMap[assetKey];
+
+          // 檢查是否有島嶼正在使用被刪除的物件，自動安全切回內建預設值
+          let affectedCount = 0;
+          appConfig.islands.forEach(function (isl) {
+            if (category === "buildings" && isl.buildingType === assetKey) {
+              isl.buildingType = "cottage";
+              affectedCount++;
+            } else if (category === "natures" && isl.natureType === assetKey) {
+              isl.natureType = "pine";
+              affectedCount++;
+            }
+          });
+
+          syncEditorUI();
+          rebuildAllIslands();
+          saveConfig(true);
+
+          if (affectedCount > 0) {
+            showToast(
+              "🗑️ 已刪除「" +
+                assetName +
+                "」，並將 " +
+                affectedCount +
+                " 座島嶼恢復為預設外觀",
+            );
+          } else {
+            showToast("🗑️ 已刪除自訂物件「" + assetName + "」");
+          }
+        }
+
+        function refreshCustomAssetDropdowns() {
+          const bGroup = document.getElementById("custom-buildings-optgroup");
+          const nGroup = document.getElementById("custom-natures-optgroup");
+          const bManageList = document.getElementById(
+            "custom-buildings-manage-list",
+          );
+          const nManageList = document.getElementById(
+            "custom-natures-manage-list",
+          );
+
+          bGroup.innerHTML = "";
+          nGroup.innerHTML = "";
+          bManageList.innerHTML = "";
+          nManageList.innerHTML = "";
+
+          const buildings =
+            (appConfig.customAssets && appConfig.customAssets.buildings) || {};
+          const bKeys = Object.keys(buildings);
+          if (bKeys.length === 0) {
+            bManageList.innerHTML =
+              '<div class="helper-note" style="padding:4px 8px;">尚無自訂建築</div>';
+          } else {
+            bKeys.forEach(function (key) {
+              const opt = document.createElement("option");
+              opt.value = key;
+              opt.textContent = buildings[key].name;
+              bGroup.appendChild(opt);
+
+              const row = document.createElement("div");
+              row.className = "custom-asset-item";
+              const titleSpan = document.createElement("span");
+              titleSpan.textContent = buildings[key].name;
+              const delBtn = document.createElement("button");
+              delBtn.type = "button";
+              delBtn.className = "btn-del-asset";
+              delBtn.title = "刪除此自訂建築";
+              delBtn.textContent = "✕";
+              delBtn.addEventListener("click", function () {
+                deleteCustomAsset("buildings", key);
+              });
+              row.appendChild(titleSpan);
+              row.appendChild(delBtn);
+              bManageList.appendChild(row);
+            });
+          }
+
+          const natures =
+            (appConfig.customAssets && appConfig.customAssets.natures) || {};
+          const nKeys = Object.keys(natures);
+          if (nKeys.length === 0) {
+            nManageList.innerHTML =
+              '<div class="helper-note" style="padding:4px 8px;">尚無自訂景觀</div>';
+          } else {
+            nKeys.forEach(function (key) {
+              const opt = document.createElement("option");
+              opt.value = key;
+              opt.textContent = natures[key].name;
+              nGroup.appendChild(opt);
+
+              const row = document.createElement("div");
+              row.className = "custom-asset-item";
+              const titleSpan = document.createElement("span");
+              titleSpan.textContent = natures[key].name;
+              const delBtn = document.createElement("button");
+              delBtn.type = "button";
+              delBtn.className = "btn-del-asset";
+              delBtn.title = "刪除此自訂景觀";
+              delBtn.textContent = "✕";
+              delBtn.addEventListener("click", function () {
+                deleteCustomAsset("natures", key);
+              });
+              row.appendChild(titleSpan);
+              row.appendChild(delBtn);
+              nManageList.appendChild(row);
+            });
+          }
+        }
+
+        function syncEditorUI() {
+          refreshCustomAssetDropdowns();
+
+          document.getElementById("input-site-title").value =
+            appConfig.siteTitle || "";
+          document.getElementById("input-site-subtitle").value =
+            appConfig.siteSubtitle || "";
+          document.getElementById("input-show-routes").checked =
+            appConfig.showRoutes !== false;
+
+          const chipsContainer = document.getElementById("island-list-chips");
+          chipsContainer.innerHTML = "";
+          appConfig.islands.forEach(function (isl) {
+            const chip = document.createElement("button");
+            chip.type = "button";
+            chip.className =
+              "island-chip" + (isl.id === selectedIslandId ? " active" : "");
+            chip.textContent = isl.name || "未命名";
+            chip.addEventListener("click", function () {
+              selectIsland(isl.id, true);
+            });
+            chipsContainer.appendChild(chip);
+          });
+
+          const current = appConfig.islands.find(function (i) {
+            return i.id === selectedIslandId;
+          });
+          const propsCard = document.getElementById("island-props-card");
+          if (!current) {
+            propsCard.style.opacity = "0.4";
+            return;
+          }
+          propsCard.style.opacity = "1";
+
+          document.getElementById("input-name").value = current.name || "";
+          document.getElementById("input-desc").value = current.desc || "";
+          document.getElementById("input-url").value = current.url || "";
+          document.getElementById("input-newtab").checked =
+            current.newTab !== false;
+
+          document.getElementById("input-x").value = current.x;
+          document.getElementById("val-x").textContent = current.x;
+          document.getElementById("input-z").value = current.z;
+          document.getElementById("val-z").textContent = current.z;
+          document.getElementById("input-radius").value = current.radius;
+          document.getElementById("val-radius").textContent = current.radius;
+          document.getElementById("input-height").value = current.height;
+          document.getElementById("val-height").textContent = current.height;
+
+          document.getElementById("input-biome").value = current.biome;
+          document.getElementById("input-hexrot").value = current.hexRot || 0;
+          document.getElementById("val-hexrot").textContent =
+            (current.hexRot || 0) + "°";
+
+          document.getElementById("input-btype").value = current.buildingType;
+          document.getElementById("input-bcolor").value = current.buildingColor;
+          document.getElementById("input-brot").value =
+            current.buildingRot || 0;
+          document.getElementById("val-brot").textContent =
+            (current.buildingRot || 0) + "°";
+          document.getElementById("input-bscale").value =
+            current.buildingScale || 1.0;
+          document.getElementById("val-bscale").textContent =
+            current.buildingScale || 1.0;
+          document.getElementById("input-bx").value = current.buildingX || 0;
+          document.getElementById("val-bx").textContent =
+            current.buildingX || 0;
+          document.getElementById("input-bz").value = current.buildingZ || 0;
+          document.getElementById("val-bz").textContent =
+            current.buildingZ || 0;
+
+          document.getElementById("input-nature").value =
+            current.natureType || "pine";
+          document.getElementById("input-ncount").value =
+            current.natureCount != null ? current.natureCount : 4;
+          document.getElementById("val-ncount").textContent =
+            current.natureCount != null ? current.natureCount : 4;
+        }
+
+        document
+          .getElementById("input-site-title")
+          .addEventListener("input", function (e) {
+            appConfig.siteTitle = e.target.value;
+            document.getElementById("display-site-title").textContent =
+              appConfig.siteTitle || "夢幻群島導航站";
+            saveConfig();
+          });
+
+        document
+          .getElementById("input-site-subtitle")
+          .addEventListener("input", function (e) {
+            appConfig.siteSubtitle = e.target.value;
+            document.getElementById("display-site-subtitle").textContent =
+              appConfig.siteSubtitle;
+            saveConfig();
+          });
+
+        document
+          .getElementById("input-show-routes")
+          .addEventListener("change", function (e) {
+            appConfig.showRoutes = e.target.checked;
+            rebuildSeaRoutes();
+            saveConfig();
+          });
+
+        function bindIslandField(
+          elementId,
+          propKey,
+          parser,
+          displayId,
+          suffix,
+        ) {
+          const el = document.getElementById(elementId);
+          const eventName =
+            el.type === "checkbox" || el.tagName === "SELECT"
+              ? "change"
+              : "input";
+          el.addEventListener(eventName, function (e) {
+            const current = appConfig.islands.find(function (i) {
+              return i.id === selectedIslandId;
+            });
+            if (!current) return;
+            const rawVal = el.type === "checkbox" ? el.checked : e.target.value;
+            const val = parser ? parser(rawVal) : rawVal;
+            current[propKey] = val;
+            if (displayId) {
+              document.getElementById(displayId).textContent =
+                val + (suffix || "");
+            }
+            rebuildAllIslands();
+            if (propKey === "name") syncEditorUI();
+            saveConfig();
+          });
+        }
+
+        bindIslandField("input-name", "name");
+        bindIslandField("input-desc", "desc");
+        bindIslandField("input-url", "url");
+        bindIslandField("input-newtab", "newTab", Boolean);
+        bindIslandField("input-x", "x", parseFloat, "val-x");
+        bindIslandField("input-z", "z", parseFloat, "val-z");
+        bindIslandField("input-radius", "radius", parseFloat, "val-radius");
+        bindIslandField("input-height", "height", parseFloat, "val-height");
+        bindIslandField("input-biome", "biome");
+        bindIslandField("input-hexrot", "hexRot", parseInt, "val-hexrot", "°");
+        bindIslandField("input-btype", "buildingType");
+        bindIslandField("input-bcolor", "buildingColor");
+        bindIslandField("input-brot", "buildingRot", parseInt, "val-brot", "°");
+        bindIslandField(
+          "input-bscale",
+          "buildingScale",
+          parseFloat,
+          "val-bscale",
+        );
+        bindIslandField("input-bx", "buildingX", parseFloat, "val-bx");
+        bindIslandField("input-bz", "buildingZ", parseFloat, "val-bz");
+        bindIslandField("input-nature", "natureType");
+        bindIslandField("input-ncount", "natureCount", parseInt, "val-ncount");
+
+        document
+          .getElementById("btn-reroll-nature")
+          .addEventListener("click", function () {
+            const current = appConfig.islands.find(function (i) {
+              return i.id === selectedIslandId;
+            });
+            if (!current) return;
+            current.natureSeed = Math.floor(Math.random() * 100000);
+            rebuildAllIslands();
+            saveConfig(true);
+          });
+
+        document
+          .getElementById("btn-add-island")
+          .addEventListener("click", function () {
+            const newId = "isl-" + Date.now();
+            const angle = Math.random() * Math.PI * 2;
+            const dist = 6 + Math.random() * 10;
+            const newIsland = {
+              id: newId,
+              name: "新探索島嶼 #" + (appConfig.islands.length + 1),
+              desc: "這是一座剛升起的新島嶼，請編輯簡介與連結",
+              url: "https://example.com",
+              newTab: true,
+              x: Math.round(Math.cos(angle) * dist * 2) / 2,
+              z: Math.round(Math.sin(angle) * dist * 2) / 2,
+              radius: 3.2,
+              height: 1.2,
+              hexRot: 0,
+              biome: "grass",
+              buildingType: "cottage",
+              buildingColor: "#38bdf8",
+              buildingRot: 0,
+              buildingScale: 1.0,
+              buildingX: 0,
+              buildingZ: 0,
+              natureType: "pine",
+              natureCount: 4,
+              natureSeed: Math.floor(Math.random() * 99999),
+            };
+            appConfig.islands.push(newIsland);
+            selectIsland(newId, true);
+            rebuildAllIslands();
+            saveConfig(true);
+            showToast("✨ 已新增一座六角形島嶼並聚焦");
+          });
+
+        document
+          .getElementById("btn-delete-island")
+          .addEventListener("click", function () {
+            if (appConfig.islands.length <= 1) {
+              showToast("⚠️ 海洋上至少需要保留一座島嶼喔！");
+              return;
+            }
+            const idx = appConfig.islands.findIndex(function (i) {
+              return i.id === selectedIslandId;
+            });
+            if (idx === -1) return;
+            const removedName = appConfig.islands[idx].name;
+            appConfig.islands.splice(idx, 1);
+            selectedIslandId = appConfig.islands[0].id;
+            rebuildAllIslands();
+            syncEditorUI();
+            saveConfig(true);
+            showToast("🗑️ 已刪除「" + removedName + "」");
+          });
+
+        document
+          .getElementById("btn-reset-default")
+          .addEventListener("click", function () {
+            if (
+              !confirm(
+                "確定要清除目前所有自訂修改，還原為初始的 5 座示範群島嗎？",
+              )
+            )
+              return;
+            appConfig = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+            selectedIslandId = appConfig.islands[0].id;
+            rebuildAllIslands();
+            syncEditorUI();
+            flyToOverview();
+            saveConfig(true);
+            showToast("🔄 已還原為預設示範群島");
+          });
+
+        // 匯入自訂積木藍圖 JSON
+        let pendingImportCategory = "buildings";
+        const assetFileInput = document.getElementById("file-import-asset");
+
+        document
+          .getElementById("btn-import-custom-building")
+          .addEventListener("click", function () {
+            pendingImportCategory = "buildings";
+            assetFileInput.click();
+          });
+
+        document
+          .getElementById("btn-import-custom-nature")
+          .addEventListener("click", function () {
+            pendingImportCategory = "natures";
+            assetFileInput.click();
+          });
+
+        assetFileInput.addEventListener("change", function (e) {
+          const file = e.target.files[0];
+          if (!file) return;
+          const fileName = file.name;
+          const baseName = fileName.replace(/\.[^/.]+$/, "");
+          const assetId = "custom-" + Date.now();
+
+          const reader = new FileReader();
+          reader.onload = function (ev) {
+            try {
+              const data = JSON.parse(ev.target.result);
+              let appliedId = assetId;
+              if (Array.isArray(data.parts)) {
+                appConfig.customAssets[pendingImportCategory][assetId] = {
+                  id: assetId,
+                  name: "✨ " + (data.name || baseName),
+                  format: "blueprint",
+                  parts: data.parts,
+                };
+              } else if (data.buildings || data.natures) {
+                if (data.buildings) {
+                  Object.assign(
+                    appConfig.customAssets.buildings,
+                    data.buildings,
+                  );
+                  if (pendingImportCategory === "buildings") {
+                    appliedId = Object.keys(data.buildings)[0] || assetId;
+                  }
+                }
+                if (data.natures) {
+                  Object.assign(appConfig.customAssets.natures, data.natures);
+                  if (pendingImportCategory === "natures") {
+                    appliedId = Object.keys(data.natures)[0] || assetId;
+                  }
+                }
+              } else {
+                throw new Error("缺少 parts 積木定義陣列");
+              }
+
+              const current = appConfig.islands.find(function (i) {
+                return i.id === selectedIslandId;
+              });
+              if (current) {
+                if (
+                  pendingImportCategory === "buildings" &&
+                  appConfig.customAssets.buildings[appliedId]
+                ) {
+                  current.buildingType = appliedId;
+                } else if (
+                  pendingImportCategory === "natures" &&
+                  appConfig.customAssets.natures[appliedId]
+                ) {
+                  current.natureType = appliedId;
+                }
+              }
+              syncEditorUI();
+              rebuildAllIslands();
+              saveConfig(true);
+              showToast("🎉 成功匯入自訂 3D 物件藍圖！");
+            } catch (err) {
+              alert("JSON 藍圖格式錯誤：" + err.message);
+            }
+          };
+          reader.readAsText(file);
+          assetFileInput.value = "";
+        });
+
+        document
+          .getElementById("btn-download-sample-asset")
+          .addEventListener("click", function () {
+            const samplePack = {
+              buildings: {
+                "sample-rocket": {
+                  id: "sample-rocket",
+                  name: "🚀 太空火箭發射台",
+                  format: "blueprint",
+                  parts: [
+                    {
+                      shape: "cylinder",
+                      args: [0.85, 0.95, 0.25, 8],
+                      pos: [0, 0.12, 0],
+                      colorRole: "dark",
+                    },
+                    {
+                      shape: "cylinder",
+                      args: [0.35, 0.45, 1.8, 8],
+                      pos: [0, 1.1, 0],
+                      colorRole: "white",
+                    },
+                    {
+                      shape: "cone",
+                      args: [0.36, 0.75, 8],
+                      pos: [0, 2.35, 0],
+                      colorRole: "main",
+                    },
+                    {
+                      shape: "box",
+                      args: [0.12, 0.6, 0.35],
+                      pos: [0.42, 0.55, 0],
+                      colorRole: "main",
+                    },
+                    {
+                      shape: "box",
+                      args: [0.12, 0.6, 0.35],
+                      pos: [-0.42, 0.55, 0],
+                      colorRole: "main",
+                    },
+                    {
+                      shape: "sphere",
+                      args: [0.18, 8, 8],
+                      pos: [0, 1.35, 0.36],
+                      colorRole: "window",
+                    },
+                  ],
+                },
+              },
+              natures: {
+                "sample-mushroom": {
+                  id: "sample-mushroom",
+                  name: "🍄 童話巨型蘑菇",
+                  format: "blueprint",
+                  parts: [
+                    {
+                      shape: "cylinder",
+                      args: [0.14, 0.2, 0.5, 7],
+                      pos: [0, 0.25, 0],
+                      colorRole: "white",
+                    },
+                    {
+                      shape: "cone",
+                      args: [0.48, 0.4, 7],
+                      pos: [0, 0.65, 0],
+                      colorRole: "crystal",
+                    },
+                    {
+                      shape: "sphere",
+                      args: [0.08, 6, 6],
+                      pos: [0.22, 0.62, 0.22],
+                      colorRole: "white",
+                    },
+                    {
+                      shape: "sphere",
+                      args: [0.07, 6, 6],
+                      pos: [-0.2, 0.68, -0.15],
+                      colorRole: "white",
+                    },
+                  ],
+                },
+              },
+            };
+            downloadTextFile(
+              "custom-3d-assets-sample.json",
+              JSON.stringify(samplePack, null, 2),
+              "application/json;charset=utf-8",
+            );
+            showToast("📄 已下載範例檔！可點上方「匯入」直接試用");
+          });
+
+        function downloadTextFile(filename, content, mimeType) {
+          const blob = new Blob([content], { type: mimeType });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }
+
+        document
+          .getElementById("btn-export-json")
+          .addEventListener("click", function () {
+            const jsonStr = JSON.stringify(appConfig, null, 2);
+            downloadTextFile(
+              "archipelago-config-v6.json",
+              jsonStr,
+              "application/json;charset=utf-8",
+            );
+            showToast("📤 已匯出完整群島 JSON 備份");
+          });
+
+        const fileInput = document.getElementById("file-import-json");
+        document
+          .getElementById("btn-import-json")
+          .addEventListener("click", function () {
+            fileInput.click();
+          });
+        fileInput.addEventListener("change", function (e) {
+          const file = e.target.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = function (ev) {
+            try {
+              const parsed = JSON.parse(ev.target.result);
+              if (!parsed || !Array.isArray(parsed.islands))
+                throw new Error("格式不正確");
+              parsed.visitorOnly = false;
+              if (!parsed.customAssets) {
+                parsed.customAssets = JSON.parse(
+                  JSON.stringify(DEFAULT_CONFIG.customAssets),
+                );
+              }
+              if (!parsed.customAssets.buildings)
+                parsed.customAssets.buildings = {};
+              if (!parsed.customAssets.natures)
+                parsed.customAssets.natures = {};
+              appConfig = parsed;
+              selectedIslandId = appConfig.islands[0]
+                ? appConfig.islands[0].id
+                : null;
+              rebuildAllIslands();
+              syncEditorUI();
+              flyToOverview();
+              saveConfig(true);
+              showToast("📥 成功匯入群島設定！");
+            } catch (err) {
+              alert("匯入失敗：請確認選擇的是正確的群島 JSON 設定檔。");
+            }
+          };
+          reader.readAsText(file);
+          fileInput.value = "";
+        });
+
+        document
+          .getElementById("btn-export-html")
+          .addEventListener("click", function () {
+            const publishConfig = JSON.parse(JSON.stringify(appConfig));
+            publishConfig.visitorOnly = true;
+
+            const docClone = document.documentElement.cloneNode(true);
+            docClone.querySelector("#canvas-container").innerHTML = "";
+            docClone.querySelector("#labels-layer").innerHTML = "";
+            docClone.querySelector("#editor-panel").classList.remove("open");
+            docClone.querySelector("body").classList.add("visitor-only-build");
+
+            const oldDataTag = docClone.querySelector(
+              "#embedded-archipelago-data",
+            );
+            if (oldDataTag) oldDataTag.remove();
+
+            const dataScript = document.createElement("script");
+            dataScript.id = "embedded-archipelago-data";
+            dataScript.type = "application/json";
+            dataScript.textContent = JSON.stringify(publishConfig);
+            docClone.querySelector("body").prepend(dataScript);
+
+            const finalHtml = "<!DOCTYPE html>\n" + docClone.outerHTML;
+            downloadTextFile(
+              "index.html",
+              finalHtml,
+              "text/html;charset=utf-8",
+            );
+            showToast("🚀 已匯出獨立訪客版 index.html！");
+          });
+
+        /* =========================================================================
+         6. 六角形島嶼、建築與自然景觀生成器
+         ========================================================================= */
+        const islandsGroup = new THREE.Group();
+        scene.add(islandsGroup);
+
+        const islandMeshMap = new Map();
+        const nightEmissiveMaterials = [];
+        const animatedProps = [];
+        const labelsLayer = document.getElementById("labels-layer");
+
+        function mulberry32(seed) {
+          return function () {
+            let t = (seed += 0x6d2b79f5);
+            t = Math.imul(t ^ (t >>> 15), t | 1);
+            t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+          };
+        }
+
+        function createWindowMat() {
+          const mat = new THREE.MeshStandardMaterial({
+            color: 0xfef08a,
+            emissive: 0xfacc15,
+            emissiveIntensity: 0.1,
+            roughness: 0.2,
+          });
+          nightEmissiveMaterials.push(mat);
+          return mat;
+        }
+
+        function buildFromBlueprint(blueprint, mainColorHex, crystalColorHex) {
+          const group = new THREE.Group();
+
+          const glowWhiteMat = new THREE.MeshStandardMaterial({
+            color: 0xffffff,
+            emissive: 0xe0f2fe,
+            emissiveIntensity: 0.15,
+            flatShading: true,
+            roughness: 0.35,
+          });
+          glowWhiteMat.userData.nightBoost = 0.65;
+          nightEmissiveMaterials.push(glowWhiteMat);
+
+          // 夜晚會有強烈紅色霓虹效果的材質
+          const neonRedMat = new THREE.MeshStandardMaterial({
+            color: 0xff1e42,
+            emissive: 0xff0033,
+            emissiveIntensity: 0.4,
+            flatShading: true,
+            roughness: 0.2,
+          });
+          neonRedMat.userData.nightBoost = 2.2;
+          nightEmissiveMaterials.push(neonRedMat);
+
+          // 【新增】夜晚會有強烈綠色霓虹效果的材質（用於麻將「發」字）
+          const neonGreenMat = new THREE.MeshStandardMaterial({
+            color: 0x10b981,
+            emissive: 0x00ff66,
+            emissiveIntensity: 0.4,
+            flatShading: true,
+            roughness: 0.2,
+          });
+          neonGreenMat.userData.nightBoost = 2.2;
+          nightEmissiveMaterials.push(neonGreenMat);
+
+          const materials = {
+            main: new THREE.MeshStandardMaterial({
+              color: mainColorHex || "#ff6b6b",
+              flatShading: true,
+              roughness: 0.6,
+            }),
+            white: new THREE.MeshStandardMaterial({
+              color: 0xf8fafc,
+              flatShading: true,
+              roughness: 0.6,
+            }),
+            dark: new THREE.MeshStandardMaterial({
+              color: 0x334155,
+              flatShading: true,
+              roughness: 0.7,
+            }),
+            wood: new THREE.MeshStandardMaterial({
+              color: 0x854d0e,
+              flatShading: true,
+              roughness: 0.8,
+            }),
+            window: createWindowMat(),
+            glowWhite: glowWhiteMat,
+            neonRed: neonRedMat,
+            neonGreen: neonGreenMat, // <--- 記得加上這一行
+            crystal: new THREE.MeshStandardMaterial({
+              color: crystalColorHex || 0x38bdf8,
+              emissive: crystalColorHex || 0x0284c7,
+              emissiveIntensity: 0.35,
+              flatShading: true,
+              roughness: 0.2,
+            }),
+          };
+
+          (blueprint.parts || []).forEach(function (part) {
+            let geo;
+            const a = part.args || [1, 1, 1];
+            if (part.shape === "cylinder")
+              geo = new THREE.CylinderGeometry(a[0], a[1], a[2], a[3] || 8);
+            else if (part.shape === "cone")
+              geo = new THREE.ConeGeometry(a[0], a[1], a[2] || 8);
+            else if (part.shape === "sphere")
+              geo = new THREE.DodecahedronGeometry(a[0], 0);
+            else geo = new THREE.BoxGeometry(a[0], a[1], a[2]);
+
+            const mat = materials[part.colorRole] || materials.main;
+            const mesh = new THREE.Mesh(geo, mat);
+            if (part.pos)
+              mesh.position.set(part.pos[0], part.pos[1], part.pos[2]);
+            if (part.rot)
+              mesh.rotation.set(part.rot[0], part.rot[1], part.rot[2]);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            group.add(mesh);
+          });
+          return group;
+        }
+
+        function buildArchitecture(type, colorHex) {
+          const customB =
+            appConfig.customAssets &&
+            appConfig.customAssets.buildings &&
+            appConfig.customAssets.buildings[type];
+          if (customB) {
+            return buildFromBlueprint(customB, colorHex);
+          }
+
+          const group = new THREE.Group();
+          const mainMat = new THREE.MeshStandardMaterial({
+            color: colorHex,
+            flatShading: true,
+            roughness: 0.6,
+          });
+          const whiteMat = new THREE.MeshStandardMaterial({
+            color: 0xf8fafc,
+            flatShading: true,
+            roughness: 0.6,
+          });
+          const darkMat = new THREE.MeshStandardMaterial({
+            color: 0x334155,
+            flatShading: true,
+            roughness: 0.7,
+          });
+          const woodMat = new THREE.MeshStandardMaterial({
+            color: 0x854d0e,
+            flatShading: true,
+            roughness: 0.8,
+          });
+          const winMat = createWindowMat();
+
+          if (type === "lighthouse") {
+            const b1 = new THREE.Mesh(
+              new THREE.CylinderGeometry(0.45, 0.6, 0.9, 8),
+              whiteMat,
+            );
+            b1.position.y = 0.45;
+            const b2 = new THREE.Mesh(
+              new THREE.CylinderGeometry(0.36, 0.45, 0.8, 8),
+              mainMat,
+            );
+            b2.position.y = 1.3;
+            const b3 = new THREE.Mesh(
+              new THREE.CylinderGeometry(0.28, 0.36, 0.7, 8),
+              whiteMat,
+            );
+            b3.position.y = 2.05;
+            const lantern = new THREE.Mesh(
+              new THREE.CylinderGeometry(0.26, 0.26, 0.38, 8),
+              winMat,
+            );
+            lantern.position.y = 2.58;
+            const roof = new THREE.Mesh(
+              new THREE.ConeGeometry(0.36, 0.45, 8),
+              mainMat,
+            );
+            roof.position.y = 2.98;
+
+            const beamPivot = new THREE.Group();
+            beamPivot.position.y = 2.58;
+            const beamGeo = new THREE.ConeGeometry(0.65, 3.2, 12, 1, true);
+            beamGeo.translate(0, -1.6, 0);
+            beamGeo.rotateX(-Math.PI / 2);
+            const beamMat = new THREE.MeshBasicMaterial({
+              color: 0xfef08a,
+              transparent: true,
+              opacity: 0.22,
+              side: THREE.DoubleSide,
+              depthWrite: false,
+            });
+            const beam = new THREE.Mesh(beamGeo, beamMat);
+            beamPivot.add(beam);
+            animatedProps.push({
+              type: "lighthouse",
+              obj: beamPivot,
+              beamMat: beamMat,
+            });
+
+            group.add(b1, b2, b3, lantern, roof, beamPivot);
+          } else if (type === "cottage") {
+            const body = new THREE.Mesh(
+              new THREE.BoxGeometry(1.3, 0.9, 1.1),
+              whiteMat,
+            );
+            body.position.y = 0.45;
+            const roof = new THREE.Mesh(
+              new THREE.ConeGeometry(1.08, 0.8, 4),
+              mainMat,
+            );
+            roof.position.y = 1.3;
+            roof.rotation.y = Math.PI / 4;
+            const chimney = new THREE.Mesh(
+              new THREE.BoxGeometry(0.22, 0.6, 0.22),
+              darkMat,
+            );
+            chimney.position.set(0.35, 1.35, -0.2);
+            const door = new THREE.Mesh(
+              new THREE.BoxGeometry(0.3, 0.5, 0.08),
+              woodMat,
+            );
+            door.position.set(0, 0.25, 0.56);
+            const win = new THREE.Mesh(
+              new THREE.BoxGeometry(0.28, 0.28, 0.08),
+              winMat,
+            );
+            win.position.set(0.38, 0.5, 0.56);
+            group.add(body, roof, chimney, door, win);
+          } else if (type === "tower") {
+            const t1 = new THREE.Mesh(
+              new THREE.BoxGeometry(1.0, 2.5, 1.0),
+              mainMat,
+            );
+            t1.position.set(-0.15, 1.25, 0);
+            const t2 = new THREE.Mesh(
+              new THREE.BoxGeometry(0.75, 1.7, 0.8),
+              whiteMat,
+            );
+            t2.position.set(0.45, 0.85, 0.2);
+            for (let y = 0.5; y <= 2.1; y += 0.5) {
+              const strip = new THREE.Mesh(
+                new THREE.BoxGeometry(1.04, 0.16, 1.04),
+                winMat,
+              );
+              strip.position.set(-0.15, y, 0);
+              group.add(strip);
+            }
+            const antenna = new THREE.Mesh(
+              new THREE.CylinderGeometry(0.03, 0.05, 0.7, 6),
+              darkMat,
+            );
+            antenna.position.set(-0.15, 2.85, 0);
+            group.add(t1, t2, antenna);
+          } else if (type === "castle") {
+            const keep = new THREE.Mesh(
+              new THREE.BoxGeometry(1.2, 1.2, 1.0),
+              whiteMat,
+            );
+            keep.position.y = 0.6;
+            const keepRoof = new THREE.Mesh(
+              new THREE.ConeGeometry(0.95, 0.75, 4),
+              mainMat,
+            );
+            keepRoof.position.y = 1.55;
+            keepRoof.rotation.y = Math.PI / 4;
+
+            const tLeft = new THREE.Mesh(
+              new THREE.CylinderGeometry(0.28, 0.32, 1.5, 8),
+              whiteMat,
+            );
+            tLeft.position.set(-0.65, 0.75, 0.3);
+            const rLeft = new THREE.Mesh(
+              new THREE.ConeGeometry(0.38, 0.6, 8),
+              mainMat,
+            );
+            rLeft.position.set(-0.65, 1.8, 0.3);
+
+            const tRight = new THREE.Mesh(
+              new THREE.CylinderGeometry(0.28, 0.32, 1.5, 8),
+              whiteMat,
+            );
+            tRight.position.set(0.65, 0.75, 0.3);
+            const rRight = new THREE.Mesh(
+              new THREE.ConeGeometry(0.38, 0.6, 8),
+              mainMat,
+            );
+            rRight.position.set(0.65, 1.8, 0.3);
+
+            const gate = new THREE.Mesh(
+              new THREE.BoxGeometry(0.36, 0.55, 0.1),
+              winMat,
+            );
+            gate.position.set(0, 0.28, 0.51);
+            group.add(keep, keepRoof, tLeft, rLeft, tRight, rRight, gate);
+          } else if (type === "windmill") {
+            const body = new THREE.Mesh(
+              new THREE.CylinderGeometry(0.45, 0.72, 1.9, 8),
+              whiteMat,
+            );
+            body.position.y = 0.95;
+            const cap = new THREE.Mesh(
+              new THREE.ConeGeometry(0.55, 0.55, 8),
+              mainMat,
+            );
+            cap.position.y = 2.15;
+            const win = new THREE.Mesh(
+              new THREE.BoxGeometry(0.26, 0.32, 0.1),
+              winMat,
+            );
+            win.position.set(0, 0.9, 0.58);
+
+            const bladesPivot = new THREE.Group();
+            bladesPivot.position.set(0, 1.65, 0.56);
+            for (let i = 0; i < 4; i++) {
+              const bladeArm = new THREE.Group();
+              bladeArm.rotation.z = (i * Math.PI) / 2;
+              const stick = new THREE.Mesh(
+                new THREE.BoxGeometry(0.06, 1.15, 0.06),
+                woodMat,
+              );
+              stick.position.y = 0.55;
+              const sail = new THREE.Mesh(
+                new THREE.BoxGeometry(0.24, 0.85, 0.03),
+                mainMat,
+              );
+              sail.position.set(0.1, 0.65, 0.02);
+              bladeArm.add(stick, sail);
+              bladesPivot.add(bladeArm);
+            }
+            animatedProps.push({ type: "windmill", obj: bladesPivot });
+            group.add(body, cap, win, bladesPivot);
+          } else if (type === "shrine") {
+            const p1 = new THREE.Mesh(
+              new THREE.CylinderGeometry(0.1, 0.12, 1.5, 8),
+              mainMat,
+            );
+            p1.position.set(-0.55, 0.75, 0.55);
+            const p2 = new THREE.Mesh(
+              new THREE.CylinderGeometry(0.1, 0.12, 1.5, 8),
+              mainMat,
+            );
+            p2.position.set(0.55, 0.75, 0.55);
+            const topBar = new THREE.Mesh(
+              new THREE.BoxGeometry(1.65, 0.16, 0.22),
+              mainMat,
+            );
+            topBar.position.set(0, 1.5, 0.55);
+            const subBar = new THREE.Mesh(
+              new THREE.BoxGeometry(1.3, 0.1, 0.14),
+              darkMat,
+            );
+            subBar.position.set(0, 1.22, 0.55);
+
+            const hall = new THREE.Mesh(
+              new THREE.BoxGeometry(1.1, 0.85, 0.85),
+              whiteMat,
+            );
+            hall.position.set(0, 0.42, -0.35);
+            const hallRoof = new THREE.Mesh(
+              new THREE.ConeGeometry(0.95, 0.6, 4),
+              darkMat,
+            );
+            hallRoof.position.set(0, 1.12, -0.35);
+            hallRoof.rotation.y = Math.PI / 4;
+            const lantern = new THREE.Mesh(
+              new THREE.BoxGeometry(0.22, 0.35, 0.22),
+              winMat,
+            );
+            lantern.position.set(0, 0.4, 0.1);
+            group.add(p1, p2, topBar, subBar, hall, hallRoof, lantern);
+          }
+
+          group.traverse(function (c) {
+            if (c.isMesh) {
+              c.castShadow = true;
+              c.receiveShadow = true;
+            }
+          });
+          return group;
+        }
+
+        function buildNatureProp(type, treeColor) {
+          const customN =
+            appConfig.customAssets &&
+            appConfig.customAssets.natures &&
+            appConfig.customAssets.natures[type];
+          if (customN) {
+            return buildFromBlueprint(customN, treeColor, 0x38bdf8);
+          }
+
+          const group = new THREE.Group();
+          const trunkMat = new THREE.MeshStandardMaterial({
+            color: 0x7c4a21,
+            flatShading: true,
+          });
+          const leafMat = new THREE.MeshStandardMaterial({
+            color: treeColor,
+            flatShading: true,
+          });
+
+          if (type === "pine") {
+            const trunk = new THREE.Mesh(
+              new THREE.CylinderGeometry(0.08, 0.12, 0.4, 6),
+              trunkMat,
+            );
+            trunk.position.y = 0.2;
+            const c1 = new THREE.Mesh(
+              new THREE.ConeGeometry(0.45, 0.7, 6),
+              leafMat,
+            );
+            c1.position.y = 0.65;
+            const c2 = new THREE.Mesh(
+              new THREE.ConeGeometry(0.34, 0.6, 6),
+              leafMat,
+            );
+            c2.position.y = 1.05;
+            group.add(trunk, c1, c2);
+          } else if (type === "palm") {
+            const trunk = new THREE.Mesh(
+              new THREE.CylinderGeometry(0.07, 0.13, 1.1, 6),
+              trunkMat,
+            );
+            trunk.position.y = 0.55;
+            trunk.rotation.z = 0.12;
+            group.add(trunk);
+            for (let i = 0; i < 5; i++) {
+              const leaf = new THREE.Mesh(
+                new THREE.ConeGeometry(0.18, 0.75, 4),
+                leafMat,
+              );
+              leaf.position.set(-0.06, 1.1, 0);
+              leaf.rotation.z = Math.PI / 2.4;
+              leaf.rotation.y = (i * Math.PI * 2) / 5;
+              group.add(leaf);
+            }
+          } else if (type === "round") {
+            const trunk = new THREE.Mesh(
+              new THREE.CylinderGeometry(0.09, 0.13, 0.5, 6),
+              trunkMat,
+            );
+            trunk.position.y = 0.25;
+            const crown = new THREE.Mesh(
+              new THREE.DodecahedronGeometry(0.45, 0),
+              leafMat,
+            );
+            crown.position.y = 0.75;
+            group.add(trunk, crown);
+          } else if (type === "rock") {
+            const rockMat = new THREE.MeshStandardMaterial({
+              color: 0x94a3b8,
+              flatShading: true,
+              roughness: 0.9,
+            });
+            const r1 = new THREE.Mesh(
+              new THREE.DodecahedronGeometry(0.36, 0),
+              rockMat,
+            );
+            r1.position.y = 0.22;
+            r1.scale.set(1.2, 0.8, 1);
+            const r2 = new THREE.Mesh(
+              new THREE.DodecahedronGeometry(0.22, 0),
+              rockMat,
+            );
+            r2.position.set(0.28, 0.14, 0.15);
+            group.add(r1, r2);
+          }
+
+          group.traverse(function (c) {
+            if (c.isMesh) {
+              c.castShadow = true;
+              c.receiveShadow = true;
+            }
+          });
+          return group;
+        }
+
+        function createIslandObject(data) {
+          const root = new THREE.Group();
+          root.position.set(data.x, 0, data.z);
+          root.userData = { islandId: data.id };
+
+          const palette = BIOME_COLORS[data.biome] || BIOME_COLORS.grass;
+          const r = data.radius;
+          const h = data.height;
+          const hexRotRad = THREE.MathUtils.degToRad(data.hexRot || 0);
+
+          const beachGeo = new THREE.CylinderGeometry(
+            r * 1.08,
+            r * 1.18,
+            0.35,
+            6,
+          );
+          const beachMat = new THREE.MeshStandardMaterial({
+            color: palette.sand,
+            flatShading: true,
+            roughness: 0.8,
+          });
+          const beachMesh = new THREE.Mesh(beachGeo, beachMat);
+          beachMesh.position.y = 0.05;
+          beachMesh.rotation.y = hexRotRad;
+          beachMesh.receiveShadow = true;
+          root.add(beachMesh);
+
+          const cliffGeo = new THREE.CylinderGeometry(r * 0.96, r * 1.03, h, 6);
+          const cliffMat = new THREE.MeshStandardMaterial({
+            color: palette.side,
+            flatShading: true,
+            roughness: 0.85,
+          });
+          const cliffMesh = new THREE.Mesh(cliffGeo, cliffMat);
+          cliffMesh.position.y = h / 2 + 0.1;
+          cliffMesh.rotation.y = hexRotRad;
+          cliffMesh.castShadow = true;
+          cliffMesh.receiveShadow = true;
+          root.add(cliffMesh);
+
+          const topGeo = new THREE.CylinderGeometry(
+            r * 0.98,
+            r * 0.96,
+            0.22,
+            6,
+          );
+          const topMat = new THREE.MeshStandardMaterial({
+            color: palette.top,
+            flatShading: true,
+            roughness: 0.7,
+          });
+          const topMesh = new THREE.Mesh(topGeo, topMat);
+          topMesh.position.y = h + 0.15;
+          topMesh.rotation.y = hexRotRad;
+          topMesh.receiveShadow = true;
+          root.add(topMesh);
+
+          const surfaceY = h + 0.25;
+
+          const ringGeo = new THREE.RingGeometry(r * 1.24, r * 1.36, 6);
+          ringGeo.rotateX(-Math.PI / 2);
+          ringGeo.rotateY(hexRotRad);
+          const ringMat = new THREE.MeshBasicMaterial({
+            color: 0xff8c42,
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.9,
+          });
+          const selectRing = new THREE.Mesh(ringGeo, ringMat);
+          selectRing.position.y = 0.12;
+          selectRing.visible = isEditMode && selectedIslandId === data.id;
+          root.add(selectRing);
+
+          const building = buildArchitecture(
+            data.buildingType,
+            data.buildingColor,
+          );
+          building.position.set(
+            data.buildingX || 0,
+            surfaceY,
+            data.buildingZ || 0,
+          );
+          building.rotation.y = THREE.MathUtils.degToRad(data.buildingRot || 0);
+          const bScale = data.buildingScale || 1.0;
+          building.scale.set(bScale, bScale, bScale);
+          root.add(building);
+
+          const rand = mulberry32(data.natureSeed || 123);
+          const count = data.natureCount != null ? data.natureCount : 4;
+          if (data.natureType !== "none" && count > 0) {
+            for (let i = 0; i < count; i++) {
+              const angle = (i / count) * Math.PI * 2 + rand() * 0.6;
+              const dist = r * (0.48 + rand() * 0.34);
+              const nx = Math.cos(angle) * dist;
+              const nz = Math.sin(angle) * dist;
+
+              const dx = nx - (data.buildingX || 0);
+              const dz = nz - (data.buildingZ || 0);
+              if (Math.hypot(dx, dz) < 1.15 * bScale) continue;
+
+              const prop = buildNatureProp(data.natureType, palette.tree);
+              prop.position.set(nx, surfaceY, nz);
+              const s = 0.75 + rand() * 0.55;
+              prop.scale.set(s, s, s);
+              prop.rotation.y = rand() * Math.PI * 2;
+              root.add(prop);
+            }
+          }
+
+          root.traverse(function (child) {
+            if (child.isMesh) {
+              child.userData.islandId = data.id;
+            }
+          });
+
+          return { root: root, selectRing: selectRing, surfaceY: surfaceY };
+        }
+
+        function rebuildAllIslands() {
+          while (islandsGroup.children.length > 0) {
+            islandsGroup.remove(islandsGroup.children[0]);
+          }
+          islandMeshMap.clear();
+          nightEmissiveMaterials.length = 0;
+          animatedProps.length = 0;
+          labelsLayer.innerHTML = "";
+
+          appConfig.islands.forEach(function (isl) {
+            const built = createIslandObject(isl);
+            islandsGroup.add(built.root);
+
+            const labelEl = document.createElement("div");
+            labelEl.className = "island-label";
+            labelEl.textContent = isl.name || "未命名島嶼";
+            if (isEditMode && selectedIslandId === isl.id) {
+              labelEl.classList.add("selected");
+            }
+            labelsLayer.appendChild(labelEl);
+
+            islandMeshMap.set(isl.id, {
+              data: isl,
+              root: built.root,
+              selectRing: built.selectRing,
+              surfaceY: built.surfaceY,
+              labelEl: labelEl,
+              currentLift: 0,
+            });
+          });
+
+          rebuildSeaRoutes();
+
+          document.getElementById("display-site-title").textContent =
+            appConfig.siteTitle || "夢幻群島導航站";
+          document.getElementById("display-site-subtitle").textContent =
+            appConfig.siteSubtitle || "";
+          document.title = appConfig.siteTitle || "3D 群島導航站";
+
+          updateDayNightCycle(true);
+        }
+
+        function updateSelectionVisuals() {
+          islandMeshMap.forEach(function (item, id) {
+            const isSel = isEditMode && id === selectedIslandId;
+            item.selectRing.visible = isSel;
+            item.labelEl.classList.toggle("selected", isSel);
+          });
+        }
+
+        /* =========================================================================
+         7. 隨時間變化的日夜光影系統
+         ========================================================================= */
+        const SKY_PRESETS = {
+          morning: {
+            sky: new THREE.Color(0xffcdb2),
+            ocean: new THREE.Color(0x3a86ff),
+            sunColor: new THREE.Color(0xffb703),
+            sunIntensity: 1.5,
+            hemiSky: 0xffe5d9,
+            hemiGround: 0x457b9d,
+            hemiIntensity: 0.85,
+            sunPos: [35, 18, -20],
+            nightGlow: 0.25,
+          },
+          noon: {
+            sky: new THREE.Color(0x7cc6fe),
+            ocean: new THREE.Color(0x1ca3ec),
+            sunColor: new THREE.Color(0xfffbeb),
+            sunIntensity: 1.85,
+            hemiSky: 0xffffff,
+            hemiGround: 0x3b82f6,
+            hemiIntensity: 0.9,
+            sunPos: [20, 42, 20],
+            nightGlow: 0.05,
+          },
+          sunset: {
+            sky: new THREE.Color(0xf48c06),
+            ocean: new THREE.Color(0x274c77),
+            sunColor: new THREE.Color(0xff5400),
+            sunIntensity: 1.6,
+            hemiSky: 0xffba08,
+            hemiGround: 0x370617,
+            hemiIntensity: 0.75,
+            sunPos: [-35, 14, 15],
+            nightGlow: 0.65,
+          },
+          night: {
+            sky: new THREE.Color(0x0f172a),
+            ocean: new THREE.Color(0x091526),
+            sunColor: new THREE.Color(0x93c5fd),
+            sunIntensity: 0.65,
+            hemiSky: 0x334155,
+            hemiGround: 0x020617,
+            hemiIntensity: 0.55,
+            sunPos: [-20, 32, -25],
+            nightGlow: 1.4,
+          },
+        };
+
+        function getResolvedTimeKey() {
+          if (timeMode !== "auto") return timeMode;
+          const hour = new Date().getHours();
+          if (hour >= 5 && hour < 9) return "morning";
+          if (hour >= 9 && hour < 16) return "noon";
+          if (hour >= 16 && hour < 19) return "sunset";
+          return "night";
+        }
+
+        function updateDayNightCycle(instant) {
+          const key = getResolvedTimeKey();
+          const preset = SKY_PRESETS[key];
+          const lerpFactor = instant ? 1 : 0.05;
+
+          renderer.setClearColor(preset.sky);
+          scene.fog.color.lerp(preset.sky, lerpFactor);
+          oceanMat.color.lerp(preset.ocean, lerpFactor);
+          sunLight.color.lerp(preset.sunColor, lerpFactor);
+          sunLight.intensity +=
+            (preset.sunIntensity - sunLight.intensity) * lerpFactor;
+          hemiLight.color.lerp(new THREE.Color(preset.hemiSky), lerpFactor);
+          hemiLight.groundColor.lerp(
+            new THREE.Color(preset.hemiGround),
+            lerpFactor,
+          );
+          hemiLight.intensity +=
+            (preset.hemiIntensity - hemiLight.intensity) * lerpFactor;
+
+          sunLight.position.lerp(
+            new THREE.Vector3(
+              preset.sunPos[0],
+              preset.sunPos[1],
+              preset.sunPos[2],
+            ),
+            lerpFactor,
+          );
+
+          nightEmissiveMaterials.forEach(function (mat) {
+            const boost = mat.userData.nightBoost || 1.0;
+            const targetGlow = preset.nightGlow * boost;
+            mat.emissiveIntensity +=
+              (targetGlow - mat.emissiveIntensity) * lerpFactor;
+          });
+        }
+
+        /* =========================================================================
+         8. 滑鼠點擊與懸停偵測
+         ========================================================================= */
+        const raycaster = new THREE.Raycaster();
+        const pointer = new THREE.Vector2();
+        let pointerDownPos = { x: 0, y: 0 };
+
+        const tooltipTitle = document.getElementById("tooltip-title");
+        const tooltipDesc = document.getElementById("tooltip-desc");
+        const tooltipUrl = document.getElementById("tooltip-url");
+
+        renderer.domElement.addEventListener("pointerdown", function (e) {
+          pointerDownPos = { x: e.clientX, y: e.clientY };
+        });
+
+        renderer.domElement.addEventListener("pointermove", function (e) {
+          pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
+          pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+          raycaster.setFromCamera(pointer, camera);
+          const intersects = raycaster.intersectObjects(
+            islandsGroup.children,
+            true,
+          );
+
+          let foundId = null;
+          for (let i = 0; i < intersects.length; i++) {
+            if (
+              intersects[i].object.userData &&
+              intersects[i].object.userData.islandId
+            ) {
+              foundId = intersects[i].object.userData.islandId;
+              break;
+            }
+          }
+
+          hoveredIslandId = foundId;
+          renderer.domElement.style.cursor = foundId ? "pointer" : "grab";
+
+          if (!isEditMode && foundId) {
+            const item = islandMeshMap.get(foundId);
+            if (item) {
+              tooltipTitle.textContent = item.data.name || "未命名島嶼";
+              tooltipDesc.textContent =
+                item.data.desc || "點擊前往探索此島嶼的網頁內容";
+              tooltipUrl.textContent = (item.data.url || "尚未設定連結") + " ↗";
+              visitorTooltip.classList.add("visible");
+            }
+          } else {
+            visitorTooltip.classList.remove("visible");
+          }
+        });
+
+        renderer.domElement.addEventListener("pointerup", function (e) {
+          const moveDist = Math.hypot(
+            e.clientX - pointerDownPos.x,
+            e.clientY - pointerDownPos.y,
+          );
+          if (moveDist > 6) return;
+
+          if (hoveredIslandId) {
+            if (isEditMode) {
+              selectIsland(hoveredIslandId, true);
+            } else {
+              const item = islandMeshMap.get(hoveredIslandId);
+              if (item && item.data.url) {
+                if (item.data.newTab) {
+                  window.open(item.data.url, "_blank", "noopener,noreferrer");
+                } else {
+                  window.location.href = item.data.url;
+                }
+              } else {
+                showToast("⚠️ 此島嶼尚未設定網頁連結");
+              }
+            }
+          }
+        });
+
+        /* =========================================================================
+         9. 主動畫迴圈
+         ========================================================================= */
+        const clock = new THREE.Clock();
+        const tempVec = new THREE.Vector3();
+
+        function animate() {
+          requestAnimationFrame(animate);
+          const elapsed = clock.getElapsedTime();
+
+          for (let i = 0; i < oceanPosAttr.count; i++) {
+            const vx = oceanPosAttr.getX(i);
+            const vz = oceanPosAttr.getZ(i);
+            const wave =
+              Math.sin(vx * 0.25 + elapsed * 1.4) * 0.14 +
+              Math.cos(vz * 0.22 + elapsed * 1.1) * 0.14;
+            oceanPosAttr.setY(i, oceanBaseY[i] + wave);
+          }
+          oceanPosAttr.needsUpdate = true;
+          oceanGeo.computeVertexNormals();
+
+          cloudsGroup.children.forEach(function (cloud) {
+            cloud.position.x += cloud.userData.speed * 0.015;
+            if (cloud.position.x > 50) cloud.position.x = -50;
+          });
+
+          sailboats.forEach(function (sb) {
+            const t = elapsed * sb.speed + sb.phase;
+            const nx = Math.cos(t) * sb.radiusX;
+            const nz = Math.sin(t) * sb.radiusZ;
+            const nextT = t + (sb.speed > 0 ? 0.05 : -0.05);
+            const nextX = Math.cos(nextT) * sb.radiusX;
+            const nextZ = Math.sin(nextT) * sb.radiusZ;
+
+            sb.mesh.position.set(
+              nx,
+              Math.sin(elapsed * 2 + sb.phase) * 0.08,
+              nz,
+            );
+            sb.mesh.lookAt(nextX, sb.mesh.position.y, nextZ);
+            sb.mesh.rotation.z = Math.sin(elapsed * 2.2 + sb.phase) * 0.08;
+          });
+
+          dolphins.forEach(function (dp) {
+            const cycle = (elapsed + dp.cycleOffset) % 7.5;
+            if (cycle < 1.8) {
+              const p = cycle / 1.8;
+              const angle = p * Math.PI;
+              const jumpHeight = Math.sin(angle) * 1.65 - 0.35;
+              const forward = (p - 0.5) * 3.6;
+
+              dp.mesh.visible = true;
+              dp.mesh.position.set(
+                dp.centerX + forward,
+                jumpHeight,
+                dp.centerZ,
+              );
+              dp.mesh.rotation.set(0, Math.PI / 2, 0);
+              dp.mesh.rotation.x = -Math.cos(angle) * 0.85;
+            } else {
+              dp.mesh.visible = false;
+            }
+          });
+
+          animatedProps.forEach(function (item) {
+            if (item.type === "windmill") {
+              item.obj.rotation.z -= 0.018;
+            } else if (item.type === "lighthouse") {
+              item.obj.rotation.y += 0.015;
+              const isDark =
+                getResolvedTimeKey() === "night" ||
+                getResolvedTimeKey() === "sunset";
+              item.beamMat.opacity = isDark ? 0.28 : 0.06;
+            }
+          });
+
+          if (cameraAnim.active) {
+            camera.position.lerp(cameraAnim.targetPos, 0.065);
+            controls.target.lerp(cameraAnim.targetLookAt, 0.08);
+            if (
+              camera.position.distanceTo(cameraAnim.targetPos) < 0.08 &&
+              controls.target.distanceTo(cameraAnim.targetLookAt) < 0.05
+            ) {
+              cameraAnim.active = false;
+            }
+          }
+
+          islandMeshMap.forEach(function (item, id) {
+            const isTarget =
+              hoveredIslandId === id || (isEditMode && selectedIslandId === id);
+            const targetLift = isTarget
+              ? 0.35
+              : Math.sin(elapsed * 1.6 + item.data.x) * 0.06;
+            item.currentLift += (targetLift - item.currentLift) * 0.12;
+            item.root.position.y = item.currentLift;
+
+            if (item.selectRing.visible) {
+              item.selectRing.rotation.z = elapsed * 0.5;
+            }
+
+            tempVec.set(
+              item.data.x,
+              item.surfaceY + item.currentLift + 2.5,
+              item.data.z,
+            );
+            tempVec.project(camera);
+
+            if (tempVec.z < 1) {
+              const sx = (tempVec.x * 0.5 + 0.5) * window.innerWidth;
+              const sy = (-tempVec.y * 0.5 + 0.5) * window.innerHeight;
+              item.labelEl.style.left = sx + "px";
+              item.labelEl.style.top = sy + "px";
+              item.labelEl.style.opacity = "1";
+            } else {
+              item.labelEl.style.opacity = "0";
+            }
+          });
+
+          updateDayNightCycle(false);
+          controls.update();
+          renderer.render(scene, camera);
+        }
+
+        window.addEventListener("resize", function () {
+          camera.aspect = window.innerWidth / window.innerHeight;
+          camera.updateProjectionMatrix();
+          renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        rebuildAllIslands();
+        animate();
+      })();
+    </script>
+  </body>
+</html>

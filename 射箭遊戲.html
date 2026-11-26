@@ -1,0 +1,914 @@
+<!doctype html>
+<html lang="zh-TW">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WebGL 專業射箭挑戰</title>
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+        font-family:
+          "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+        user-select: none;
+        background-color: #87ceeb;
+      }
+      #ui-layer {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+      }
+      .hud-top {
+        display: flex;
+        justify-content: space-between;
+        padding: 20px;
+      }
+      .ui-panel {
+        background: rgba(0, 0, 0, 0.65);
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        backdrop-filter: blur(4px);
+        font-size: 18px;
+      }
+      .highlight {
+        color: #ffe500;
+        font-weight: bold;
+      }
+
+      #crosshair {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: rgba(255, 255, 255, 0.9);
+        font-size: 24px;
+        font-weight: 300;
+      }
+      #message-toast {
+        position: absolute;
+        top: 35%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: white;
+        font-size: 32px;
+        text-shadow: 0 2px 5px rgba(0, 0, 0, 0.9);
+        opacity: 0;
+        transition: opacity 0.3s;
+        font-weight: bold;
+      }
+
+      #power-container {
+        position: absolute;
+        bottom: 40px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 300px;
+        height: 12px;
+        background: rgba(0, 0, 0, 0.6);
+        border: 2px solid rgba(255, 255, 255, 0.8);
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+      }
+      #power-bar {
+        width: 0%;
+        height: 100%;
+        background: #00ff00;
+        transition: background-color 0.2s;
+      }
+      #power-bar.wobble {
+        background: #ff3333;
+        box-shadow: 0 0 10px #ff3333;
+      }
+
+      /* 模態視窗 (Modal) */
+      #modal-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        pointer-events: auto;
+        z-index: 10;
+      }
+      .modal-content {
+        background: #222;
+        color: white;
+        padding: 30px;
+        border-radius: 12px;
+        text-align: center;
+        border: 1px solid #555;
+        min-width: 300px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
+      }
+      .modal-content h1 {
+        margin-top: 0;
+        color: #ffe500;
+      }
+      .btn {
+        background: #2bb3f0;
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        font-size: 18px;
+        border-radius: 6px;
+        cursor: pointer;
+        margin-top: 20px;
+        font-weight: bold;
+        transition: background 0.2s;
+      }
+      .btn:hover {
+        background: #1a8ec4;
+      }
+
+      #leaderboard {
+        text-align: left;
+        margin-top: 20px;
+        background: rgba(0, 0, 0, 0.3);
+        padding: 10px;
+        border-radius: 6px;
+      }
+      #leaderboard ol {
+        padding-left: 20px;
+        margin: 10px 0;
+      }
+
+      .hidden {
+        display: none !important;
+      }
+    </style>
+
+    <!-- Three.js 0.160.0 Import Map -->
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <!-- 遊戲 UI -->
+    <div id="ui-layer">
+      <div class="hud-top">
+        <div class="ui-panel">
+          <div
+            style="font-size: 22px; font-weight: bold; margin-bottom: 5px"
+            id="level-display"
+          >
+            關卡 1
+          </div>
+          <div>距離: <span id="dist-display" class="highlight">30m</span></div>
+          <div>
+            本局分數:
+            <span id="round-score-display" class="highlight">0</span> / 及格
+            <span id="pass-score-display">0</span>
+          </div>
+          <div>總分: <span id="total-score-display">0</span></div>
+        </div>
+        <div class="ui-panel" style="text-align: right">
+          <div style="font-size: 20px; margin-bottom: 5px">
+            剩餘箭矢: <span id="arrows-display" class="highlight">6</span>
+          </div>
+          <div>
+            風向與風力:
+            <span
+              id="wind-arrow"
+              style="
+                display: inline-block;
+                font-weight: bold;
+                transition: transform 0.3s;
+              "
+              >↑</span
+            >
+            <span id="wind-speed" class="highlight">0.0</span>
+          </div>
+        </div>
+      </div>
+      <div id="crosshair">✛</div>
+      <div id="message-toast">準備開始</div>
+      <div id="power-container"><div id="power-bar"></div></div>
+    </div>
+
+    <!-- 模態視窗 -->
+    <div id="modal-overlay">
+      <div class="modal-content" id="modal-box">
+        <h1 id="modal-title">專業射箭挑戰</h1>
+        <div id="modal-text" style="font-size: 18px; margin: 15px 0">
+          準備好挑戰你的準度了嗎？
+        </div>
+
+        <div id="input-area" class="hidden">
+          <input
+            type="text"
+            id="player-name"
+            placeholder="輸入你的名字"
+            maxlength="10"
+            style="
+              padding: 8px;
+              font-size: 16px;
+              border-radius: 4px;
+              border: 1px solid #ccc;
+              width: 80%;
+            "
+          />
+        </div>
+
+        <div id="leaderboard" class="hidden">
+          <h3 style="margin-top: 0; color: #2bb3f0">排行榜 TOP 5</h3>
+          <ol id="leaderboard-list"></ol>
+        </div>
+
+        <button class="btn" id="modal-btn">開始遊戲</button>
+      </div>
+    </div>
+
+    <script type="module">
+      import * as THREE from "three";
+
+      // ==========================================
+      // 1. 遊戲資料設定 (關卡)
+      // ==========================================
+      const LEVELS = [
+        {
+          dist: 30,
+          pass: 20,
+          moveX: 0,
+          moveY: 0,
+          speed: 0,
+          desc: "30米 靜止靶",
+        },
+        {
+          dist: 40,
+          pass: 30,
+          moveX: 0,
+          moveY: 0,
+          speed: 0,
+          desc: "40米 靜止靶",
+        },
+        {
+          dist: 50,
+          pass: 40,
+          moveX: 0,
+          moveY: 0,
+          speed: 0,
+          desc: "50米 靜止靶",
+        },
+        {
+          dist: 40,
+          pass: 35,
+          moveX: 8,
+          moveY: 0,
+          speed: 1.5,
+          desc: "40米 左右移動靶",
+        },
+        {
+          dist: 50,
+          pass: 40,
+          moveX: 12,
+          moveY: 0,
+          speed: 2.5,
+          desc: "50米 快速左右移動靶",
+        },
+        {
+          dist: 60,
+          pass: 45,
+          moveX: 10,
+          moveY: 5,
+          speed: 3.0,
+          desc: "60米 飄忽游移靶",
+        },
+      ];
+
+      const TARGET_RADIUS = 3;
+      const GRAVITY = 15;
+      const MAX_POWER = 90;
+      const ARROWS_PER_ROUND = 6;
+
+      let currentLevel = 0;
+      let arrowsLeft = ARROWS_PER_ROUND;
+      let totalScore = 0;
+      let roundScore = 0;
+
+      let gameState = "MODAL"; // MODAL, IDLE, DRAWING, FLYING, SCORED
+      let power = 0;
+      let holdTime = 0;
+      let windVector = new THREE.Vector2(0, 0);
+
+      // ==========================================
+      // 2. 場景初始化
+      // ==========================================
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x87ceeb);
+      scene.fog = new THREE.Fog(0x87ceeb, 20, 150);
+
+      const camera = new THREE.PerspectiveCamera(
+        60,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        250,
+      );
+      camera.position.set(0, 5, 0);
+
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      document.body.appendChild(renderer.domElement);
+
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+      scene.add(ambientLight);
+
+      const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+      dirLight.position.set(20, 60, 20);
+      dirLight.castShadow = true;
+      dirLight.shadow.camera.top = 100;
+      dirLight.shadow.camera.bottom = -100;
+      dirLight.shadow.camera.left = -100;
+      dirLight.shadow.camera.right = 100;
+      scene.add(dirLight);
+
+      // ==========================================
+      // 3. 材質生成 (Canvas 2D)
+      // ==========================================
+      function create10RingTargetTexture() {
+        const canvas = document.createElement("canvas");
+        canvas.width = 1024;
+        canvas.height = 1024;
+        const ctx = canvas.getContext("2d");
+        const center = 512;
+
+        // 五色十環 (白, 黑, 藍, 紅, 黃) - 每色 2 環
+        const colors = [
+          "#FFFFFF",
+          "#FFFFFF",
+          "#222222",
+          "#222222",
+          "#2BB3F0",
+          "#2BB3F0",
+          "#F23030",
+          "#F23030",
+          "#FFE500",
+          "#FFE500",
+        ];
+
+        ctx.fillStyle = "#e0e0e0";
+        ctx.fillRect(0, 0, 1024, 1024);
+
+        for (let i = 0; i < 10; i++) {
+          const radius = 500 - i * 50; // 500, 450, 400 ... 50
+          ctx.beginPath();
+          ctx.arc(center, center, radius, 0, Math.PI * 2);
+          ctx.fillStyle = colors[i];
+          ctx.fill();
+
+          // 畫環線
+          ctx.lineWidth = 2;
+          // 深色背景用白線，亮色背景用黑線
+          ctx.strokeStyle =
+            i === 2 || i === 3 || i === 4 || i === 5
+              ? "rgba(255,255,255,0.5)"
+              : "rgba(0,0,0,0.5)";
+          ctx.stroke();
+        }
+
+        // 十字準心標記
+        ctx.beginPath();
+        ctx.moveTo(center - 15, center);
+        ctx.lineTo(center + 15, center);
+        ctx.moveTo(center, center - 15);
+        ctx.lineTo(center, center + 15);
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = "rgba(0,0,0,0.5)";
+        ctx.stroke();
+
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+        return texture;
+      }
+
+      function createGrassTexture() {
+        const canvas = document.createElement("canvas");
+        canvas.width = 256;
+        canvas.height = 256;
+        const ctx = canvas.getContext("2d");
+        for (let i = 0; i < 256; i += 4) {
+          for (let j = 0; j < 256; j += 4) {
+            ctx.fillStyle = `rgb(${50 + Math.random() * 15},${130 + Math.random() * 30},${40 + Math.random() * 15})`;
+            ctx.fillRect(i, j, 4, 4);
+          }
+        }
+        const tex = new THREE.CanvasTexture(canvas);
+        tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+        tex.repeat.set(80, 80);
+        return tex;
+      }
+
+      // ==========================================
+      // 4. 場景物件建置
+      // ==========================================
+      const groundGeo = new THREE.PlaneGeometry(400, 400);
+      const groundMat = new THREE.MeshStandardMaterial({
+        map: createGrassTexture(),
+        roughness: 0.8,
+      });
+      const ground = new THREE.Mesh(groundGeo, groundMat);
+      ground.rotation.x = -Math.PI / 2;
+      ground.receiveShadow = true;
+      scene.add(ground);
+
+      const targetGroup = new THREE.Group();
+      targetGroup.position.set(0, 5, -30); // 初始位置
+      scene.add(targetGroup);
+
+      const targetGeo = new THREE.CylinderGeometry(
+        TARGET_RADIUS,
+        TARGET_RADIUS,
+        0.4,
+        64,
+      );
+      const targetMat = new THREE.MeshStandardMaterial({
+        map: create10RingTargetTexture(),
+        roughness: 0.6,
+      });
+      const targetMesh = new THREE.Mesh(targetGeo, targetMat);
+      targetMesh.rotation.x = Math.PI / 2;
+      targetMesh.castShadow = true;
+      targetGroup.add(targetMesh);
+
+      // 靶架
+      const woodMat = new THREE.MeshStandardMaterial({
+        color: 0x8b5a2b,
+        roughness: 0.9,
+      });
+      const legGeo = new THREE.CylinderGeometry(0.15, 0.15, 10);
+      const leg1 = new THREE.Mesh(legGeo, woodMat);
+      leg1.position.set(-1.8, -4, -0.5);
+      leg1.rotation.z = Math.PI / 12;
+      leg1.castShadow = true;
+      const leg2 = new THREE.Mesh(legGeo, woodMat);
+      leg2.position.set(1.8, -4, -0.5);
+      leg2.rotation.z = -Math.PI / 12;
+      leg2.castShadow = true;
+      targetGroup.add(leg1);
+      targetGroup.add(leg2);
+
+      // 建立箭矢的函式
+      function createArrow() {
+        const group = new THREE.Group();
+        const shaft = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.02, 0.02, 2).rotateX(Math.PI / 2),
+          new THREE.MeshStandardMaterial({ color: 0x222222 }),
+        );
+        const tip = new THREE.Mesh(
+          new THREE.ConeGeometry(0.04, 0.15).rotateX(Math.PI / 2),
+          new THREE.MeshStandardMaterial({ color: 0xaaaaaa, metalness: 0.8 }),
+        );
+        tip.position.z = -1;
+        const fMat = new THREE.MeshStandardMaterial({ color: 0xcc0000 });
+        const f1 = new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.15, 0.3), fMat);
+        f1.position.set(0, 0.08, 0.85);
+        const f2 = new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.15, 0.3), fMat);
+        f2.position.set(0, -0.08, 0.85);
+        const f3 = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.01, 0.3), fMat);
+        f3.position.set(0.08, 0, 0.85);
+        const f4 = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.01, 0.3), fMat);
+        f4.position.set(-0.08, 0, 0.85);
+        group.add(shaft, tip, f1, f2, f3, f4);
+        group.castShadow = true;
+        return group;
+      }
+
+      const cameraArrow = createArrow();
+      camera.add(cameraArrow);
+      scene.add(camera);
+
+      let flyingArrow = null;
+      let arrowVelocity = new THREE.Vector3();
+      let stuckArrows = []; // 留在靶上的箭
+
+      // ==========================================
+      // 5. 遊戲邏輯與 UI
+      // ==========================================
+      const DOM = {
+        level: document.getElementById("level-display"),
+        dist: document.getElementById("dist-display"),
+        roundScore: document.getElementById("round-score-display"),
+        passScore: document.getElementById("pass-score-display"),
+        totalScore: document.getElementById("total-score-display"),
+        arrows: document.getElementById("arrows-display"),
+        windArrow: document.getElementById("wind-arrow"),
+        windSpeed: document.getElementById("wind-speed"),
+        toast: document.getElementById("message-toast"),
+        powerBar: document.getElementById("power-bar"),
+        modalOverlay: document.getElementById("modal-overlay"),
+        modalTitle: document.getElementById("modal-title"),
+        modalText: document.getElementById("modal-text"),
+        modalBtn: document.getElementById("modal-btn"),
+        inputArea: document.getElementById("input-area"),
+        playerName: document.getElementById("player-name"),
+        leaderboard: document.getElementById("leaderboard"),
+        leaderboardList: document.getElementById("leaderboard-list"),
+      };
+
+      function showToast(text, duration = 2000) {
+        DOM.toast.innerText = text;
+        DOM.toast.style.opacity = "1";
+        setTimeout(() => {
+          if (gameState !== "MODAL") DOM.toast.style.opacity = "0";
+        }, duration);
+      }
+
+      function showModal(
+        title,
+        text,
+        btnText,
+        callback,
+        showInput = false,
+        showLeaderboard = false,
+      ) {
+        gameState = "MODAL";
+        DOM.modalTitle.innerText = title;
+        DOM.modalText.innerHTML = text;
+        DOM.modalBtn.innerText = btnText;
+        DOM.modalOverlay.classList.remove("hidden");
+
+        DOM.inputArea.classList.toggle("hidden", !showInput);
+        DOM.leaderboard.classList.toggle("hidden", !showLeaderboard);
+
+        if (showLeaderboard) updateLeaderboardUI();
+
+        DOM.modalBtn.onclick = () => {
+          if (showInput && DOM.playerName.value.trim() !== "") {
+            saveScore(DOM.playerName.value.trim(), totalScore);
+          }
+          DOM.modalOverlay.classList.add("hidden");
+          callback();
+        };
+      }
+
+      function generateWind() {
+        const levelData = LEVELS[currentLevel];
+        // 隨難度增加風力
+        const maxWind = 5 + currentLevel * 2;
+        windVector.x = (Math.random() - 0.5) * maxWind;
+        windVector.y = (Math.random() - 0.5) * (maxWind * 0.3);
+
+        const speed = Math.sqrt(windVector.x ** 2 + windVector.y ** 2);
+        DOM.windSpeed.innerText = speed.toFixed(1);
+
+        const angleDeg =
+          Math.atan2(windVector.y, windVector.x) * (180 / Math.PI);
+        DOM.windArrow.style.transform = `rotate(${-angleDeg + 90}deg)`;
+      }
+
+      function setupLevel() {
+        const levelData = LEVELS[currentLevel];
+        targetGroup.position.set(0, 5, -levelData.dist);
+
+        // 清除上一關靶上的箭
+        stuckArrows.forEach((arrow) => targetGroup.remove(arrow));
+        stuckArrows = [];
+
+        arrowsLeft = ARROWS_PER_ROUND;
+        roundScore = 0;
+
+        DOM.level.innerText = `關卡 ${currentLevel + 1}`;
+        DOM.dist.innerText = `${levelData.dist}m`;
+        DOM.passScore.innerText = levelData.pass;
+        DOM.roundScore.innerText = roundScore;
+        DOM.arrows.innerText = arrowsLeft;
+
+        generateWind();
+        resetBow();
+        showToast(`第 ${currentLevel + 1} 關開始\n${levelData.desc}`, 3000);
+        gameState = "IDLE";
+      }
+
+      function resetBow() {
+        if (flyingArrow) scene.remove(flyingArrow);
+        flyingArrow = null;
+        power = 0;
+        holdTime = 0;
+        cameraArrow.visible = true;
+        cameraArrow.position.set(0.3, -0.2, -1.5);
+        DOM.powerBar.style.width = "0%";
+        DOM.powerBar.classList.remove("wobble");
+      }
+
+      // 排行榜存取
+      function getLeaderboard() {
+        const data = localStorage.getItem("archeryScores");
+        return data ? JSON.parse(data) : [];
+      }
+      function saveScore(name, score) {
+        const board = getLeaderboard();
+        board.push({ name, score });
+        board.sort((a, b) => b.score - a.score);
+        localStorage.setItem(
+          "archeryScores",
+          JSON.stringify(board.slice(0, 10)),
+        ); // 保留前10
+      }
+      function updateLeaderboardUI() {
+        const board = getLeaderboard();
+        DOM.leaderboardList.innerHTML =
+          board
+            .slice(0, 5)
+            .map(
+              (entry) =>
+                `<li>${entry.name} - <span style="color:#FFE500">${entry.score} 分</span></li>`,
+            )
+            .join("") || "<li>尚無紀錄</li>";
+      }
+
+      // ==========================================
+      // 6. 互動監聽
+      // ==========================================
+      const mouse = new THREE.Vector2(0, 0);
+      window.addEventListener("mousemove", (e) => {
+        if (gameState === "MODAL") return;
+        mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+      });
+
+      window.addEventListener("mousedown", (e) => {
+        if (e.button !== 0 || gameState !== "IDLE") return;
+        gameState = "DRAWING";
+        DOM.toast.style.opacity = "0";
+        cameraArrow.position.set(0, -0.1, -1.5);
+      });
+
+      window.addEventListener("mouseup", (e) => {
+        if (e.button !== 0 || gameState !== "DRAWING") return;
+        shootArrow();
+      });
+
+      function shootArrow() {
+        gameState = "FLYING";
+        arrowsLeft--;
+        DOM.arrows.innerText = arrowsLeft;
+        DOM.powerBar.style.width = "0%";
+        DOM.powerBar.classList.remove("wobble");
+        cameraArrow.visible = false;
+
+        flyingArrow = createArrow();
+        cameraArrow.getWorldPosition(flyingArrow.position);
+        flyingArrow.quaternion.copy(camera.quaternion);
+        scene.add(flyingArrow);
+
+        const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(
+          camera.quaternion,
+        );
+        const speed = 25 + power; // 基礎速度 + 蓄力
+        arrowVelocity.copy(dir).multiplyScalar(speed);
+      }
+
+      function calculateHitAndScore() {
+        // 將箭矢的世界座標轉換到標靶的局部座標空間
+        const localHit = targetMesh.worldToLocal(flyingArrow.position.clone());
+
+        // XZ平面為靶面，計算離靶心距離
+        const dist = Math.sqrt(localHit.x ** 2 + localHit.z ** 2);
+
+        // 十環，半徑3，每環0.3
+        const ringWidth = TARGET_RADIUS / 10;
+        let points = 0;
+
+        if (dist <= TARGET_RADIUS) {
+          points = 11 - Math.ceil(dist / ringWidth);
+          if (points < 1) points = 1;
+          if (points > 10) points = 10;
+        }
+
+        if (points > 0) {
+          let ringName = points === 10 ? "完美十環！" : `命中 ${points} 環`;
+          showToast(ringName);
+          roundScore += points;
+          totalScore += points;
+          DOM.roundScore.innerText = roundScore;
+          DOM.totalScore.innerText = totalScore;
+
+          // 將箭矢保留在靶上 (使用 Object3D.attach 保持世界位置不變並轉移父物件)
+          targetGroup.attach(flyingArrow);
+          stuckArrows.push(flyingArrow);
+          flyingArrow = null;
+        } else {
+          showToast("脫靶！");
+          scene.remove(flyingArrow);
+          flyingArrow = null;
+        }
+
+        gameState = "SCORED";
+
+        setTimeout(() => {
+          if (arrowsLeft > 0) {
+            resetBow();
+            generateWind();
+            gameState = "IDLE";
+          } else {
+            checkLevelEnd();
+          }
+        }, 1500);
+      }
+
+      function checkLevelEnd() {
+        const levelData = LEVELS[currentLevel];
+        const passed = roundScore >= levelData.pass;
+
+        if (passed) {
+          if (currentLevel < LEVELS.length - 1) {
+            showModal(
+              "關卡完成！",
+              `恭喜及格！<br>本局得分: <span class="highlight">${roundScore}</span>`,
+              "下一關",
+              () => {
+                currentLevel++;
+                setupLevel();
+              },
+            );
+          } else {
+            showModal(
+              "全破關卡！",
+              `你是真正的神射手！<br>總分: <span class="highlight">${totalScore}</span>`,
+              "返回標題",
+              () => {
+                currentLevel = 0;
+                totalScore = 0;
+                DOM.totalScore.innerText = "0";
+                showModal(
+                  "專業射箭挑戰",
+                  "準備好挑戰你的準度了嗎？",
+                  "開始遊戲",
+                  setupLevel,
+                  false,
+                  true,
+                );
+              },
+              true,
+              true,
+            );
+          }
+        } else {
+          showModal(
+            "挑戰失敗",
+            `本局得分: ${roundScore} (及格需 ${levelData.pass})<br>總分: <span class="highlight">${totalScore}</span>`,
+            "重新開始",
+            () => {
+              currentLevel = 0;
+              totalScore = 0;
+              DOM.totalScore.innerText = "0";
+              setupLevel();
+            },
+            true,
+            true,
+          );
+        }
+      }
+
+      window.addEventListener("resize", () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+
+      // ==========================================
+      // 7. 主迴圈
+      // ==========================================
+      const clock = new THREE.Clock();
+
+      function animate() {
+        requestAnimationFrame(animate);
+        const dt = Math.min(clock.getDelta(), 0.1);
+        const time = clock.getElapsedTime();
+
+        // 1. 更新動態靶位置
+        if (gameState !== "MODAL") {
+          const levelData = LEVELS[currentLevel];
+          if (levelData.speed > 0) {
+            // 基準 Z 是 -levelData.dist
+            const baseX = 0,
+              baseY = 5;
+            targetGroup.position.x =
+              baseX + Math.sin(time * levelData.speed) * levelData.moveX;
+            targetGroup.position.y =
+              baseY + Math.sin(time * levelData.speed * 1.3) * levelData.moveY;
+          }
+        }
+
+        // 2. 瞄準與相機控制
+        if (gameState === "IDLE" || gameState === "DRAWING") {
+          const maxAngle = Math.PI * 0.15;
+          let targetRotY = -mouse.x * maxAngle;
+          let targetRotX = mouse.y * maxAngle;
+
+          let wobbleX = 0,
+            wobbleY = 0;
+
+          if (gameState === "DRAWING") {
+            power += dt * 50;
+            if (power >= MAX_POWER) {
+              power = MAX_POWER;
+              holdTime += dt;
+              DOM.powerBar.classList.add("wobble");
+
+              const wobbleIntensity = Math.min(holdTime * 0.012, 0.05);
+              wobbleX =
+                Math.sin(time * 25) * wobbleIntensity +
+                Math.sin(time * 11) * wobbleIntensity * 0.5;
+              wobbleY =
+                Math.cos(time * 28) * wobbleIntensity +
+                Math.cos(time * 7) * wobbleIntensity * 0.5;
+            }
+
+            DOM.powerBar.style.width = `${(power / MAX_POWER) * 100}%`;
+            cameraArrow.position.z = -1.5 + (power / MAX_POWER) * 0.8; // 拉弓動畫
+          }
+
+          camera.rotation.set(
+            targetRotX + wobbleX,
+            targetRotY + wobbleY,
+            0,
+            "YXZ",
+          );
+        }
+
+        // 3. 箭矢物理飛行與碰撞
+        if (gameState === "FLYING" && flyingArrow) {
+          // 物理計算
+          arrowVelocity.y -= GRAVITY * dt;
+          arrowVelocity.x += windVector.x * dt;
+          arrowVelocity.y += windVector.y * dt;
+
+          const prevPos = flyingArrow.position.clone();
+          flyingArrow.position.addScaledVector(arrowVelocity, dt);
+
+          // 轉向沿著軌跡
+          const lookTarget = flyingArrow.position.clone().add(arrowVelocity);
+          flyingArrow.lookAt(lookTarget);
+
+          // 碰撞偵測 (與標靶)
+          // 由於標靶可能會移動，最準確的做法是將箭的位置轉換到靶面的局部座標
+          const arrowLocalPos = targetMesh.worldToLocal(
+            flyingArrow.position.clone(),
+          );
+          const prevLocalPos = targetMesh.worldToLocal(prevPos);
+
+          // 靶面朝向 local Y (CylinderGeometry 轉了 90度，原本頂部Y，轉成面向Z，所以厚度在 local Y)
+          // 當箭矢穿過靶面 (local Y 從正變負，或接近 0)
+          if (arrowLocalPos.y <= 0.2 && prevLocalPos.y > -0.2) {
+            const distToCenter2D = Math.sqrt(
+              arrowLocalPos.x ** 2 + arrowLocalPos.z ** 2,
+            );
+            if (distToCenter2D <= TARGET_RADIUS) {
+              // 鎖定在靶面上
+              arrowLocalPos.y = 0.15; // 插進去一點點
+              flyingArrow.position.copy(targetMesh.localToWorld(arrowLocalPos));
+              calculateHitAndScore();
+            }
+          }
+
+          // 擊中地面
+          if (gameState === "FLYING" && flyingArrow.position.y <= 0) {
+            flyingArrow.position.y = 0.05;
+            calculateHitAndScore(); // 會被判定為脫靶
+          }
+
+          // 飛太遠
+          if (
+            gameState === "FLYING" &&
+            flyingArrow.position.z < targetGroup.position.z - 30
+          ) {
+            calculateHitAndScore(); // 脫靶
+          }
+        }
+
+        renderer.render(scene, camera);
+      }
+
+      // 初始化開始視窗
+      showModal(
+        "專業射箭挑戰",
+        "準備好挑戰你的準度了嗎？<br><br>目標：在六箭內達到及格分數晉級！",
+        "開始遊戲",
+        setupLevel,
+        false,
+        true,
+      );
+      animate();
+    </script>
+  </body>
+</html>

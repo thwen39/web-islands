@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <!-- 鎖定手機縮放比例，避免點擊時畫面放大縮小 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>奇雞連連 (Gobblet Gobblers) 3D網頁版</title>
+    <style>
+        /* 基本重置與排版 */
+        * { box-sizing: border-box; font-family: 'Microsoft JhengHei', sans-serif; }
+        body { 
+            background: #e0f2f1; 
+            margin: 0; 
+            padding: 10px; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            user-select: none;
+            min-height: 100vh;
+        }
+        h1 { color: #00695c; text-shadow: 1px 2px #b2dfdb; margin: 10px 0 5px 0; text-align: center; font-size: 24px;}
+        p.desc { color: #004d40; margin-bottom: 10px; text-align: center; font-size: 14px; }
+
+        /* UI 資訊區 */
+        .info-panel {
+            margin-bottom: 15px;
+            font-size: 18px;
+            font-weight: bold;
+            padding: 8px 20px;
+            border-radius: 12px;
+            background: #fff;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .turn-0 { color: #e65100; border: 2px solid #ffcc80; }
+        .turn-1 { color: #01579b; border: 2px solid #81d4fa; }
+
+        /* 遊戲主區塊：預設為手機直式排列 (藍色在上、棋盤在中、橘色在下) */
+        .game-area {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            align-items: center;
+            width: 100%;
+            max-width: 800px;
+        }
+
+        /* 備用區 (玩家陣營) */
+        .reserve {
+            display: flex;
+            flex-wrap: wrap;
+            width: 100%;
+            max-width: 320px;
+            min-height: 90px;
+            gap: 8px;
+            background: #ffffff;
+            padding: 10px;
+            border-radius: 15px;
+            box-shadow: 0 5px 10px rgba(0,0,0,0.1);
+            justify-content: center;
+            align-items: center;
+        }
+        .reserve h3 { width: 100%; text-align: center; margin: 0 0 10px 0; font-size: 16px; }
+        .p0-title { color: #e65100; border-bottom: 2px solid #ffcc80; padding-bottom: 5px; }
+        .p1-title { color: #01579b; border-bottom: 2px solid #81d4fa; padding-bottom: 5px; }
+
+        /* 井字棋盤 */
+        .board {
+            display: grid;
+            grid-template-columns: repeat(3, 90px);
+            grid-template-rows: repeat(3, 90px);
+            gap: 10px;
+            background: #8d6e63;
+            padding: 12px;
+            border-radius: 15px;
+            box-shadow: inset 0 0 15px rgba(0,0,0,0.4), 0 8px 15px rgba(0,0,0,0.3);
+        }
+        .cell {
+            background: #efebe9;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            box-shadow: inset 2px 2px 8px rgba(0,0,0,0.2);
+            transition: background 0.2s;
+        }
+        .cell:hover { background: #d7ccc8; }
+        .cell.drag-over { background: #ffecb3; border: 2px dashed #ffb300; }
+
+        /* 3D 棋子 (可愛公雞) */
+        .piece {
+            border-radius: 50%;
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            /* 避免手機長按出現預設選單 */
+            -webkit-touch-callout: none;
+        }
+        .piece:active { transform: scale(0.9); }
+        .piece[draggable="true"] { cursor: grab; }
+        .piece[draggable="true"]:active { cursor: grabbing; }
+
+        /* 在備用區與棋盤區的定位差異 */
+        .reserve .piece { position: relative; }
+        .cell .piece { position: absolute; }
+
+        /* 橘色陣營 (Player 0) */
+        .p0 {
+            background: radial-gradient(circle at 30% 30%, #ffb74d, #e65100);
+            box-shadow: 2px 4px 6px rgba(0,0,0,0.3), inset -3px -5px 10px rgba(0,0,0,0.2);
+            border: 2px solid #bf360c;
+        }
+        /* 藍色陣營 (Player 1) */
+        .p1 {
+            background: radial-gradient(circle at 30% 30%, #4fc3f7, #01579b);
+            box-shadow: 2px 4px 6px rgba(0,0,0,0.3), inset -3px -5px 10px rgba(0,0,0,0.2);
+            border: 2px solid #003c8f;
+        }
+
+        /* 尺寸大中小 (手機版預設較小) */
+        .size-3 { width: 75px; height: 75px; font-size: 40px; z-index: 3; }
+        .size-2 { width: 55px; height: 55px; font-size: 30px; z-index: 2; }
+        .size-1 { width: 35px; height: 35px; font-size: 18px; z-index: 1; }
+
+        /* 選取與拖拉特效 */
+        .selected {
+            box-shadow: 0 0 15px 6px #ffeb3b, inset -3px -5px 10px rgba(0,0,0,0.2);
+            transform: scale(1.1) translateY(-3px);
+            z-index: 10;
+        }
+        .dragging { opacity: 0.5; }
+
+        .btn {
+            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 16px;
+            font-weight: bold;
+            border: none;
+            border-radius: 8px;
+            background: #00897b;
+            color: white;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            transition: 0.2s;
+        }
+        .btn:hover { background: #00695c; transform: translateY(-2px); }
+
+        /* ================= 寬螢幕/電腦版 樣式 ================= */
+        @media (min-width: 768px) {
+            .game-area {
+                flex-direction: row; /* 電腦版改為橫向排列：橘色 ｜ 棋盤 ｜ 藍色 */
+                align-items: flex-start;
+                justify-content: center;
+            }
+            .reserve {
+                width: 150px;
+                min-height: 380px;
+                align-content: flex-start;
+            }
+            .board {
+                grid-template-columns: repeat(3, 110px);
+                grid-template-rows: repeat(3, 110px);
+                gap: 12px;
+                padding: 15px;
+            }
+            .size-3 { width: 90px; height: 90px; font-size: 50px; }
+            .size-2 { width: 65px; height: 65px; font-size: 35px; }
+            .size-1 { width: 40px; height: 40px; font-size: 22px; }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>🐔 奇雞連連</h1>
+    <p class="desc">手機：點擊選取後點擊空格<br>電腦：支援滑鼠拖曳 (Drag & Drop)</p>
+
+    <div class="info-panel" id="statusInfo">準備開始...</div>
+
+    <div class="game-area">
+        <!-- 玩家1 陣營 (手機版在上，電腦版在右) -->
+        <div class="reserve" id="reserve1"></div>
+
+        <!-- 井字棋盤 -->
+        <div class="board" id="board"></div>
+
+        <!-- 玩家0 陣營 (手機版在下，電腦版在左) -->
+        <div class="reserve" id="reserve0"></div>
+    </div>
+
+    <button class="btn" onclick="initGame()">🔄 重新開始遊戲</button>
+
+    <script>
+        let board = [];
+        let reserves = { 0: [], 1: [] };
+        let currentTurn = 0; // 0=橘色, 1=藍色
+        let winner = null;
+        let selectedData = null; // 紀錄目前被點擊選取的棋子
+
+        // 初始化遊戲
+        function initGame() {
+            board = [
+                [[], [], []],
+                [[], [], []],
+                [[], [], []]
+            ];
+
+            const createPieces = (player) => [
+                { id: `p${player}_L1`, player, size: 3 }, { id: `p${player}_L2`, player, size: 3 },
+                { id: `p${player}_M1`, player, size: 2 }, { id: `p${player}_M2`, player, size: 2 },
+                { id: `p${player}_S1`, player, size: 1 }, { id: `p${player}_S2`, player, size: 1 }
+            ];
+
+            reserves[0] = createPieces(0);
+            reserves[1] = createPieces(1);
+            currentTurn = 0;
+            winner = null;
+            selectedData = null;
+
+            render();
+        }
+
+        // 渲染畫面
+        function render() {
+            updateStatus();
+            renderReserves();
+            renderBoard();
+        }
+
+        function updateStatus() {
+            const statusEl = document.getElementById('statusInfo');
+            if (winner !== null) {
+                if (winner === -1) {
+                    statusEl.innerHTML = `🤝 平手！雙方同時連線。`;
+                    statusEl.className = 'info-panel';
+                } else {
+                    statusEl.innerHTML = `🎉 ${winner === 0 ? '橘色公雞' : '藍色公雞'} 獲勝！ 🎉`;
+                    statusEl.className = `info-panel turn-${winner}`;
+                }
+            } else {
+                statusEl.innerHTML = `換 ${currentTurn === 0 ? '橘色 (下方)' : '藍色 (上方)'} 行動`;
+                statusEl.className = `info-panel turn-${currentTurn}`;
+            }
+        }
+
+        // 建立 HTML 棋子元素
+        function createPieceDOM(piece, sourceInfo) {
+            const el = document.createElement('div');
+            el.className = `piece p${piece.player} size-${piece.size}`;
+            el.innerHTML = '🐔'; 
+            
+            const canMove = (piece.player === currentTurn && winner === null);
+            
+            if (canMove) {
+                el.draggable = true;
+                
+                // 拖拉事件
+                el.ondragstart = (e) => {
+                    selectedData = sourceInfo; 
+                    e.dataTransfer.setData('text/plain', JSON.stringify(sourceInfo));
+                    // 為了不打斷拖拉，使用 setTimeout 加上拖曳中的半透明樣式，而不呼叫 render() 重繪
+                    setTimeout(() => el.classList.add('dragging'), 0);
+                };
+                el.ondragend = () => {
+                    el.classList.remove('dragging');
+                };
+
+                // 點擊事件 (支援手機 Tap to move)
+                el.onclick = (e) => {
+                    e.stopPropagation(); 
+                    
+                    // 情境：我已經選了一隻大雞，現在點擊自己場上的小雞，這代表我想用大雞「蓋住」小雞
+                    if (selectedData && selectedData.id !== sourceInfo.id && sourceInfo.type === 'board') {
+                        handleMoveToCell(sourceInfo.r, sourceInfo.c);
+                        return;
+                    }
+
+                    // 一般情境：選取 或 取消選取
+                    if (selectedData && selectedData.id === sourceInfo.id) {
+                        selectedData = null; // 點擊第二次取消選取
+                    } else {
+                        selectedData = sourceInfo;
+                    }
+                    render();
+                };
+            } else {
+                el.draggable = false;
+            }
+
+            // 標示被選取的狀態
+            if (selectedData && selectedData.id === piece.id) {
+                el.classList.add('selected');
+            }
+
+            return el;
+        }
+
+        // 渲染備用區
+        function renderReserves() {
+            for (let p = 0; p <= 1; p++) {
+                const container = document.getElementById(`reserve${p}`);
+                container.innerHTML = `<h3 class="p${p}-title">${p === 0 ? '🍊 橘色公雞' : '💧 藍色公雞'}</h3>`;
+                
+                reserves[p].forEach(piece => {
+                    const sourceInfo = { type: 'reserve', player: piece.player, size: piece.size, id: piece.id };
+                    container.appendChild(createPieceDOM(piece, sourceInfo));
+                });
+            }
+        }
+
+        // 渲染棋盤
+        function renderBoard() {
+            const container = document.getElementById('board');
+            container.innerHTML = ''; 
+
+            for (let r = 0; r < 3; r++) {
+                for (let c = 0; c < 3; c++) {
+                    const cellEl = document.createElement('div');
+                    cellEl.className = 'cell';
+
+                    // 處理拖放與點擊格子事件
+                    cellEl.ondragover = (e) => {
+                        e.preventDefault();
+                        cellEl.classList.add('drag-over');
+                    };
+                    cellEl.ondragleave = () => cellEl.classList.remove('drag-over');
+                    cellEl.ondrop = (e) => {
+                        e.preventDefault();
+                        cellEl.classList.remove('drag-over');
+                        handleMoveToCell(r, c);
+                    };
+                    cellEl.onclick = () => {
+                        handleMoveToCell(r, c);
+                    };
+
+                    const stack = board[r][c];
+                    stack.forEach((piece, index) => {
+                        const sourceInfo = { type: 'board', player: piece.player, size: piece.size, id: piece.id, r, c };
+                        const pieceDOM = createPieceDOM(piece, sourceInfo);
+                        
+                        // 被壓在下方的雞無法被點擊或拖曳
+                        if (index !== stack.length - 1) {
+                            pieceDOM.draggable = false;
+                            pieceDOM.onclick = null;
+                            pieceDOM.style.cursor = 'default';
+                        }
+                        cellEl.appendChild(pieceDOM);
+                    });
+
+                    container.appendChild(cellEl);
+                }
+            }
+        }
+
+        // 處理移動邏輯
+        function handleMoveToCell(r, c) {
+            if (winner !== null || !selectedData) return;
+
+            const targetStack = board[r][c];
+            const targetTopPiece = targetStack.length > 0 ? targetStack[targetStack.length - 1] : null;
+
+            // 規則 1: 點回原本的位子 -> 取消選取
+            if (selectedData.type === 'board' && selectedData.r === r && selectedData.c === c) {
+                selectedData = null;
+                render();
+                return;
+            }
+
+            // 規則 2: 大吃小 (只能套在比自己小的公雞上)
+            if (targetTopPiece && selectedData.size <= targetTopPiece.size) {
+                alert("❌ 不行喔！只能把公雞罩在『體型比牠小』的公雞上！");
+                return;
+            }
+
+            // 執行移動
+            let pieceToMove = null;
+            if (selectedData.type === 'reserve') {
+                const idx = reserves[selectedData.player].findIndex(p => p.id === selectedData.id);
+                pieceToMove = reserves[selectedData.player].splice(idx, 1)[0];
+            } else {
+                pieceToMove = board[selectedData.r][selectedData.c].pop();
+            }
+
+            board[r][c].push(pieceToMove);
+            selectedData = null;
+            
+            checkWin();
+
+            if (winner === null) {
+                currentTurn = 1 - currentTurn;
+            }
+
+            render();
+        }
+
+        // 檢查勝利條件
+        function checkWin() {
+            const lines = [
+                [[0,0], [0,1], [0,2]], [[1,0], [1,1], [1,2]], [[2,0], [2,1], [2,2]], // 橫
+                [[0,0], [1,0], [2,0]], [[0,1], [1,1], [2,1]], [[0,2], [1,2], [2,2]], // 直
+                [[0,0], [1,1], [2,2]], [[0,2], [1,1], [2,0]]                         // 斜
+            ];
+
+            let p0Win = false;
+            let p1Win = false;
+
+            lines.forEach(line => {
+                const tops = line.map(([r, c]) => {
+                    const stack = board[r][c];
+                    return stack.length > 0 ? stack[stack.length - 1].player : null;
+                });
+                
+                if (tops[0] === 0 && tops[1] === 0 && tops[2] === 0) p0Win = true;
+                if (tops[0] === 1 && tops[1] === 1 && tops[2] === 1) p1Win = true;
+            });
+
+            if (p0Win && p1Win) winner = -1; // 雙方同時連線(極少見但規則上可能發生)
+            else if (p0Win) winner = 0;
+            else if (p1Win) winner = 1;
+        }
+
+        initGame();
+
+    </script>
+</body>
+</html>
