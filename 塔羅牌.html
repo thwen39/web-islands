@@ -1,0 +1,1641 @@
+<!doctype html>
+<html lang="zh-TW">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mystic Tarot - 命運之輪的指引（三牌陣版）</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Noto+Serif+TC:wght@300;400;600&display=swap");
+
+      /* === 全域基礎樣式 === */
+      body {
+        font-family: "Noto Serif TC", serif;
+        background: radial-gradient(circle at center, #1a0b2e 0%, #05010a 100%);
+        color: #e2e8f0;
+        overflow-x: hidden;
+      }
+
+      h1,
+      h2,
+      h3,
+      .cinzel {
+        font-family: "Cinzel", serif;
+      }
+
+      /* 神秘流金文字效果 */
+      .gold-text {
+        background: linear-gradient(
+          to right,
+          #bf953f,
+          #fcf6ba,
+          #b38728,
+          #fbf5b7
+        );
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        text-shadow: 0 0 20px rgba(252, 246, 186, 0.2);
+      }
+
+      .mystic-shadow {
+        box-shadow:
+          0 0 30px rgba(179, 135, 40, 0.15),
+          inset 0 0 20px rgba(179, 135, 40, 0.05);
+      }
+
+      /* === 三牌陣 3D 翻牌動畫與響應式尺寸 === */
+      .scene {
+        width: 210px;
+        height: 360px;
+        perspective: 1200px;
+        margin: 0 auto;
+      }
+
+      @media (min-width: 640px) {
+        .scene {
+          width: 175px;
+          height: 300px;
+        }
+      }
+
+      @media (min-width: 1280px) {
+        .scene {
+          width: 195px;
+          height: 335px;
+        }
+      }
+
+      .card {
+        width: 100%;
+        height: 100%;
+        position: relative;
+        transition:
+          transform 0.9s cubic-bezier(0.4, 0, 0.2, 1),
+          box-shadow 0.3s ease;
+        transform-style: preserve-3d;
+        cursor: pointer;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.85);
+        border-radius: 12px;
+      }
+
+      /* 待翻牌呼吸微光提示 */
+      .card.can-flip {
+        animation: cardPulse 2s infinite alternate;
+      }
+      .card.can-flip:hover {
+        transform: translateY(-6px) scale(1.02);
+        box-shadow: 0 15px 35px rgba(252, 246, 186, 0.35);
+      }
+
+      @keyframes cardPulse {
+        0% {
+          box-shadow: 0 0 12px rgba(179, 135, 40, 0.35);
+        }
+        100% {
+          box-shadow: 0 0 26px rgba(252, 246, 186, 0.75);
+        }
+      }
+
+      .card.is-flipped {
+        transform: rotateY(180deg);
+        cursor: default;
+        animation: none;
+      }
+
+      .card-face {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        backface-visibility: hidden;
+        border-radius: 12px;
+        border: 2px solid #b38728;
+        overflow: hidden;
+      }
+
+      /* 牌背設計 */
+      .card-front {
+        background: repeating-linear-gradient(
+          45deg,
+          #110722,
+          #110722 10px,
+          #1a0b2e 10px,
+          #1a0b2e 20px
+        );
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .card-front::after {
+        content: "";
+        position: absolute;
+        top: 12px;
+        left: 12px;
+        right: 12px;
+        bottom: 12px;
+        border: 1px solid rgba(252, 246, 186, 0.3);
+        border-radius: 8px;
+        background: radial-gradient(
+          circle at center,
+          transparent 40%,
+          rgba(179, 135, 40, 0.12) 100%
+        );
+      }
+
+      .card-front-icon {
+        font-size: 3rem;
+        color: rgba(252, 246, 186, 0.65);
+        filter: drop-shadow(0 0 10px rgba(252, 246, 186, 0.3));
+      }
+
+      /* 牌面設計 */
+      .card-back {
+        background-color: #0f081a;
+        transform: rotateY(180deg);
+        display: flex;
+        flex-direction: column;
+      }
+
+      .card-image-container {
+        width: 100%;
+        height: 100%;
+        position: absolute;
+        top: 0;
+        left: 0;
+        z-index: 1;
+        transition: transform 0.5s ease;
+      }
+
+      .card-image {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        opacity: 0.88;
+      }
+
+      .card-overlay {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        padding: 16px 8px 12px;
+        background: linear-gradient(
+          to top,
+          rgba(0, 0, 0, 0.95) 0%,
+          rgba(0, 0, 0, 0.65) 65%,
+          transparent 100%
+        );
+        z-index: 2;
+        text-align: center;
+      }
+
+      /* 逆位旋轉 180 度 */
+      .is-reversed .card-image-container {
+        transform: rotateZ(180deg);
+      }
+
+      /* 自訂捲軸 */
+      ::-webkit-scrollbar {
+        width: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #110722;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #b38728;
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #fcf6ba;
+      }
+
+      /* 載入轉圈動畫 */
+      .loader {
+        border: 3px solid rgba(179, 135, 40, 0.2);
+        border-top: 3px solid #b38728;
+        border-radius: 50%;
+        width: 20px;
+        height: 20px;
+        animation: spin 1s linear infinite;
+        display: inline-block;
+        vertical-align: middle;
+      }
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      .twinkle {
+        animation: twinkle 3s infinite alternate;
+      }
+      @keyframes twinkle {
+        0% {
+          opacity: 0.4;
+        }
+        100% {
+          opacity: 1;
+        }
+      }
+
+      select option {
+        background-color: #1a0b2e;
+        color: #e2e8f0;
+      }
+    </style>
+  </head>
+  <body
+    class="min-h-screen relative flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8"
+  >
+    <!-- 星空背景裝飾 -->
+    <div
+      class="fixed inset-0 pointer-events-none z-0 overflow-hidden opacity-35"
+    >
+      <div
+        class="absolute top-10 left-10 w-2 h-2 bg-white rounded-full twinkle"
+      ></div>
+      <div
+        class="absolute top-40 right-20 w-1.5 h-1.5 bg-white rounded-full twinkle"
+        style="animation-delay: 1s"
+      ></div>
+      <div
+        class="absolute bottom-20 left-1/4 w-2 h-2 bg-white rounded-full twinkle"
+        style="animation-delay: 0.5s"
+      ></div>
+      <div
+        class="absolute top-1/3 right-1/3 w-1 h-1 bg-amber-200 rounded-full twinkle"
+        style="animation-delay: 1.5s"
+      ></div>
+    </div>
+
+    <!-- 主容器 -->
+    <div
+      class="relative z-10 w-full max-w-7xl grid grid-cols-1 lg:grid-cols-12 gap-8 items-start"
+    >
+      <!-- === 左側面板：控制區與解讀結果 === -->
+      <div class="lg:col-span-6 flex flex-col gap-6">
+        <div
+          class="text-center lg:text-left mb-2 flex flex-col sm:flex-row justify-between items-center sm:items-end"
+        >
+          <div>
+            <h1 class="text-4xl sm:text-5xl mb-2 gold-text tracking-wider">
+              Mystic Tarot
+            </h1>
+            <p class="text-amber-200/70 text-base sm:text-lg">
+              三牌陣聖殿：揭示時間脈絡與行動指引。
+            </p>
+          </div>
+          <!-- 功能按鈕（歷史紀錄 & 系統設定） -->
+          <div class="flex gap-4 mt-4 sm:mt-0">
+            <button
+              onclick="openHistory()"
+              class="text-amber-500 hover:text-amber-300 text-sm flex items-center transition-colors min-h-[44px]"
+            >
+              <svg
+                class="w-5 h-5 mr-1"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                ></path>
+              </svg>
+              歷史紀錄
+            </button>
+            <button
+              onclick="openSettings()"
+              class="text-amber-500 hover:text-amber-300 text-sm flex items-center transition-colors min-h-[44px]"
+            >
+              <svg
+                class="w-5 h-5 mr-1"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                ></path>
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                ></path>
+              </svg>
+              系統設定
+            </button>
+          </div>
+        </div>
+
+        <!-- 占卜問題與牌陣設定卡片 -->
+        <div
+          class="bg-black/40 border border-amber-500/30 p-6 rounded-xl mystic-shadow backdrop-blur-sm space-y-5"
+        >
+          <!-- 1. 牌陣模式選擇 -->
+          <div>
+            <label
+              for="spreadType"
+              class="block text-amber-200 mb-2 font-semibold"
+              >選擇三牌陣模式：</label
+            >
+            <select
+              id="spreadType"
+              onchange="updateSpreadLabels()"
+              class="w-full bg-slate-900/90 border border-amber-500/50 rounded-lg p-3 text-gray-100 focus:outline-none focus:ring-2 focus:ring-amber-500"
+            >
+              <option value="timeline">
+                ⏳ 時間之流（過去 ➔ 現在 ➔ 未來）
+              </option>
+              <option value="causality">
+                🧭 事件剖析（原因 ➔ 結果 ➔ 建議）
+              </option>
+            </select>
+          </div>
+
+          <!-- 2. 輸入問題 -->
+          <div>
+            <label
+              for="question"
+              class="block text-amber-200 mb-2 font-semibold"
+              >你的問題（你想探索的事項）：</label
+            >
+            <textarea
+              id="question"
+              rows="3"
+              placeholder="例如：我最近在考慮轉職，未來的發展與該注意什麼？"
+              class="w-full bg-slate-900/80 border border-amber-500/50 rounded-lg p-4 text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent resize-none"
+            ></textarea>
+          </div>
+
+          <!-- 3. 進階自訂牌面（可折疊） -->
+          <div class="border-t border-amber-500/20 pt-3">
+            <button
+              type="button"
+              onclick="toggleManualPanel()"
+              class="w-full flex justify-between items-center text-sm text-amber-300/80 hover:text-amber-200 py-1 transition-colors"
+            >
+              <span class="flex items-center">
+                <span class="mr-2">🔮</span> 進階設定：分別指定第 1、2、3
+                張牌（選填）
+              </span>
+              <span id="manualToggleIcon" class="text-xs">▼ 展開</span>
+            </button>
+
+            <div
+              id="manualPanel"
+              class="hidden mt-4 space-y-3 bg-slate-950/60 p-4 rounded-lg border border-amber-500/20"
+            >
+              <p class="text-xs text-gray-400 mb-2">
+                預設為「隨機抽牌（自動排除重複牌面）」，亦可手動指定特定牌面進行解讀測試。
+              </p>
+              <!-- 第 1 張指定 -->
+              <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
+                <span
+                  id="manualLabel0"
+                  class="sm:col-span-3 text-xs font-semibold text-amber-200"
+                  >1. 過去：</span
+                >
+                <select
+                  id="manualCard0"
+                  class="sm:col-span-5 bg-slate-900 border border-amber-500/30 rounded p-2 text-xs text-gray-200 focus:outline-none focus:border-amber-500"
+                >
+                  <option value="random">✨ 隨機抽牌 ✨</option>
+                </select>
+                <select
+                  id="manualOrientation0"
+                  class="sm:col-span-4 bg-slate-900 border border-amber-500/30 rounded p-2 text-xs text-gray-200 focus:outline-none focus:border-amber-500"
+                >
+                  <option value="random">✨ 隨機正逆 ✨</option>
+                  <option value="upright">正位 (Upright)</option>
+                  <option value="reversed">逆位 (Reversed)</option>
+                </select>
+              </div>
+
+              <!-- 第 2 張指定 -->
+              <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
+                <span
+                  id="manualLabel1"
+                  class="sm:col-span-3 text-xs font-semibold text-amber-200"
+                  >2. 現在：</span
+                >
+                <select
+                  id="manualCard1"
+                  class="sm:col-span-5 bg-slate-900 border border-amber-500/30 rounded p-2 text-xs text-gray-200 focus:outline-none focus:border-amber-500"
+                >
+                  <option value="random">✨ 隨機抽牌 ✨</option>
+                </select>
+                <select
+                  id="manualOrientation1"
+                  class="sm:col-span-4 bg-slate-900 border border-amber-500/30 rounded p-2 text-xs text-gray-200 focus:outline-none focus:border-amber-500"
+                >
+                  <option value="random">✨ 隨機正逆 ✨</option>
+                  <option value="upright">正位 (Upright)</option>
+                  <option value="reversed">逆位 (Reversed)</option>
+                </select>
+              </div>
+
+              <!-- 第 3 張指定 -->
+              <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
+                <span
+                  id="manualLabel2"
+                  class="sm:col-span-3 text-xs font-semibold text-amber-200"
+                  >3. 未來：</span
+                >
+                <select
+                  id="manualCard2"
+                  class="sm:col-span-5 bg-slate-900 border border-amber-500/30 rounded p-2 text-xs text-gray-200 focus:outline-none focus:border-amber-500"
+                >
+                  <option value="random">✨ 隨機抽牌 ✨</option>
+                </select>
+                <select
+                  id="manualOrientation2"
+                  class="sm:col-span-4 bg-slate-900 border border-amber-500/30 rounded p-2 text-xs text-gray-200 focus:outline-none focus:border-amber-500"
+                >
+                  <option value="random">✨ 隨機正逆 ✨</option>
+                  <option value="upright">正位 (Upright)</option>
+                  <option value="reversed">逆位 (Reversed)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- 送出按鈕 -->
+          <div class="flex justify-end items-center pt-2">
+            <button
+              id="drawBtn"
+              onclick="prepareSpread()"
+              class="w-full sm:w-auto bg-gradient-to-r from-amber-600 to-amber-800 hover:from-amber-500 hover:to-amber-700 text-white font-bold py-3 px-8 rounded-lg shadow-lg border border-amber-400 transition-all transform hover:scale-105 active:scale-95 min-h-[48px]"
+            >
+              開始洗牌與佈陣
+            </button>
+          </div>
+        </div>
+
+        <!-- 靈性解讀結果區 -->
+        <div
+          id="resultContainer"
+          class="hidden bg-black/40 border border-amber-500/30 p-6 rounded-xl mystic-shadow backdrop-blur-sm min-h-[260px] flex flex-col"
+        >
+          <h3
+            class="text-xl gold-text mb-4 border-b border-amber-500/30 pb-2 flex justify-between items-center"
+          >
+            <span id="resultTitle">靈性牌陣解讀</span>
+            <span id="loadingIndicator" class="hidden text-sm text-amber-300"
+              ><span class="loader mr-2"></span>連結星界中...</span
+            >
+          </h3>
+          <div
+            id="readingContent"
+            class="text-gray-300 leading-relaxed space-y-4 whitespace-pre-wrap min-h-[150px] flex-grow"
+          >
+            <!-- AI 打字機解讀內容 -->
+          </div>
+          <!-- 下載按鈕 -->
+          <div
+            id="downloadBtnContainer"
+            class="hidden mt-6 pt-4 border-t border-amber-500/30 text-right"
+          >
+            <button
+              onclick="downloadCurrentRecord()"
+              class="text-sm bg-gray-800 hover:bg-gray-700 border border-amber-500/50 text-amber-200 py-2 px-4 rounded transition-colors inline-flex items-center min-h-[44px]"
+            >
+              <svg
+                class="w-4 h-4 mr-2"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                ></path>
+              </svg>
+              下載本次三牌陣紀錄 (TXT)
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- === 右側面板：三牌陣展示區 === -->
+      <div
+        class="lg:col-span-6 flex flex-col items-center justify-center pt-4 lg:pt-8"
+      >
+        <!-- 狀態引導提示橫幅 -->
+        <div
+          id="spreadStatusBanner"
+          class="mb-6 px-5 py-2.5 rounded-full bg-amber-950/60 border border-amber-500/40 text-amber-200 text-sm text-center shadow-lg transition-all"
+        >
+          請先在左側輸入問題，點擊「開始洗牌與佈陣」
+        </div>
+
+        <!-- 三張牌並排（電腦版橫排 / 手機版直排） -->
+        <div
+          class="w-full flex flex-col sm:flex-row justify-center items-center gap-6 sm:gap-4 xl:gap-6"
+        >
+          <!-- 第 1 張牌位 -->
+          <div class="flex flex-col items-center">
+            <div
+              class="mb-3 px-4 py-1 rounded-full bg-black/60 border border-amber-500/40 text-amber-300 text-sm font-semibold tracking-wider"
+            >
+              <span id="posBadge0">過去</span>
+            </div>
+            <div class="scene">
+              <div class="card" id="tarotCard0" onclick="handleCardClick(0)">
+                <div class="card-face card-front">
+                  <div class="card-front-icon">✧</div>
+                  <span
+                    id="tapHint0"
+                    class="hidden mt-3 text-xs text-amber-200/80 tracking-widest animate-pulse"
+                    >點擊翻開</span
+                  >
+                </div>
+                <div class="card-face card-back" id="cardBack0">
+                  <div class="card-image-container">
+                    <img
+                      id="cardImg0"
+                      src=""
+                      alt="Tarot Card 1"
+                      class="card-image"
+                      onerror="
+                        this.src =
+                          'https://placehold.co/300x500/2a1b38/d4af37?text=Mystic+Tarot'
+                      "
+                    />
+                  </div>
+                  <div class="card-overlay">
+                    <h4
+                      id="cardNameDisplay0"
+                      class="text-base sm:text-lg font-bold gold-text tracking-wide cinzel"
+                    ></h4>
+                    <p
+                      id="cardPositionDisplay0"
+                      class="text-xs text-gray-300 mt-0.5 uppercase tracking-wider"
+                    ></p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 第 2 張牌位 -->
+          <div class="flex flex-col items-center">
+            <div
+              class="mb-3 px-4 py-1 rounded-full bg-black/60 border border-amber-500/40 text-amber-300 text-sm font-semibold tracking-wider"
+            >
+              <span id="posBadge1">現在</span>
+            </div>
+            <div class="scene">
+              <div class="card" id="tarotCard1" onclick="handleCardClick(1)">
+                <div class="card-face card-front">
+                  <div class="card-front-icon">✧</div>
+                  <span
+                    id="tapHint1"
+                    class="hidden mt-3 text-xs text-amber-200/80 tracking-widest animate-pulse"
+                    >點擊翻開</span
+                  >
+                </div>
+                <div class="card-face card-back" id="cardBack1">
+                  <div class="card-image-container">
+                    <img
+                      id="cardImg1"
+                      src=""
+                      alt="Tarot Card 2"
+                      class="card-image"
+                      onerror="
+                        this.src =
+                          'https://placehold.co/300x500/2a1b38/d4af37?text=Mystic+Tarot'
+                      "
+                    />
+                  </div>
+                  <div class="card-overlay">
+                    <h4
+                      id="cardNameDisplay1"
+                      class="text-base sm:text-lg font-bold gold-text tracking-wide cinzel"
+                    ></h4>
+                    <p
+                      id="cardPositionDisplay1"
+                      class="text-xs text-gray-300 mt-0.5 uppercase tracking-wider"
+                    ></p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 第 3 張牌位 -->
+          <div class="flex flex-col items-center">
+            <div
+              class="mb-3 px-4 py-1 rounded-full bg-black/60 border border-amber-500/40 text-amber-300 text-sm font-semibold tracking-wider"
+            >
+              <span id="posBadge2">未來</span>
+            </div>
+            <div class="scene">
+              <div class="card" id="tarotCard2" onclick="handleCardClick(2)">
+                <div class="card-face card-front">
+                  <div class="card-front-icon">✧</div>
+                  <span
+                    id="tapHint2"
+                    class="hidden mt-3 text-xs text-amber-200/80 tracking-widest animate-pulse"
+                    >點擊翻開</span
+                  >
+                </div>
+                <div class="card-face card-back" id="cardBack2">
+                  <div class="card-image-container">
+                    <img
+                      id="cardImg2"
+                      src=""
+                      alt="Tarot Card 3"
+                      class="card-image"
+                      onerror="
+                        this.src =
+                          'https://placehold.co/300x500/2a1b38/d4af37?text=Mystic+Tarot'
+                      "
+                    />
+                  </div>
+                  <div class="card-overlay">
+                    <h4
+                      id="cardNameDisplay2"
+                      class="text-base sm:text-lg font-bold gold-text tracking-wide cinzel"
+                    ></h4>
+                    <p
+                      id="cardPositionDisplay2"
+                      class="text-xs text-gray-300 mt-0.5 uppercase tracking-wider"
+                    ></p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <p
+          class="text-amber-200/50 text-xs sm:text-sm mt-8 text-center max-w-md"
+        >
+          靜心凝視三張牌面，依直覺逐一點擊翻開；當三張牌全數揭曉後，星界將為你揭示完整訊息。
+        </p>
+      </div>
+    </div>
+
+    <!-- === 提示訊息彈窗 === -->
+    <div
+      id="messageBox"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 hidden backdrop-blur-sm transition-opacity duration-300 opacity-0"
+    >
+      <div
+        class="bg-gray-900 border border-amber-500/50 p-6 rounded-xl shadow-2xl max-w-sm w-full transform scale-95 transition-transform duration-300 mx-4"
+      >
+        <h3 class="text-xl gold-text mb-3">星界提示</h3>
+        <p id="messageText" class="text-gray-300 mb-6 leading-relaxed"></p>
+        <div class="text-right">
+          <button
+            onclick="closeMessage()"
+            class="bg-amber-700 hover:bg-amber-600 text-white px-6 py-2 rounded-lg transition-colors"
+          >
+            確認
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- === 系統設定彈窗（API Key & 自訂牌圖） === -->
+    <div
+      id="settingsModal"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 hidden backdrop-blur-md transition-opacity duration-300 opacity-0"
+    >
+      <div
+        class="bg-slate-900 border border-amber-500/50 rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col transform scale-95 transition-transform duration-300 mx-4"
+      >
+        <div
+          class="p-6 border-b border-amber-500/30 flex justify-between items-center"
+        >
+          <h2 class="text-2xl gold-text">系統設定</h2>
+          <button
+            onclick="closeSettings()"
+            class="text-gray-400 hover:text-white transition-colors"
+          >
+            <svg
+              class="w-6 h-6"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M6 18L18 6M6 6l12 12"
+              ></path>
+            </svg>
+          </button>
+        </div>
+
+        <div class="p-6 overflow-y-auto flex-1 custom-scrollbar space-y-6">
+          <!-- API Key 設定 -->
+          <div class="bg-black/40 p-4 rounded-lg border border-amber-500/20">
+            <h3 class="text-lg gold-text mb-2 flex items-center">
+              <svg
+                class="w-5 h-5 mr-2"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4v-3.252a1 1 0 01.293-.707l8.198-8.198A6 6 0 0121 9z"
+                ></path>
+              </svg>
+              1. Gemini API 金鑰
+            </h3>
+            <p class="text-sm text-gray-400 mb-3">
+              請輸入您的 Google Gemini API
+              Key。金鑰僅會安全地儲存於您的瀏覽器本地端 (LocalStorage)。
+            </p>
+            <input
+              type="password"
+              id="apiKeyInput"
+              placeholder="在此輸入 API Key (如 AIzaSy...)"
+              class="w-full bg-slate-900 border border-gray-700 rounded-md p-2 text-sm text-gray-200 focus:outline-none focus:border-amber-500 transition-colors"
+            />
+          </div>
+
+          <!-- 自訂塔羅牌庫圖片 -->
+          <div>
+            <h3 class="text-lg gold-text mb-2">
+              2. 自訂塔羅牌庫 (Major Arcana)
+            </h3>
+            <p class="text-sm text-gray-400 mb-4">
+              在此為 22 張大阿爾克那設定專屬的圖片
+              URL。若留空，將使用本地端預設圖片 (塔羅牌/...)。
+            </p>
+            <div id="settingsList" class="space-y-3"></div>
+          </div>
+        </div>
+
+        <div
+          class="p-6 border-t border-amber-500/30 bg-black/20 flex justify-end gap-3"
+        >
+          <button
+            onclick="closeSettings()"
+            class="px-5 py-2 rounded-lg text-gray-300 hover:text-white hover:bg-gray-800 transition-colors"
+          >
+            取消
+          </button>
+          <button
+            onclick="saveSettings()"
+            class="bg-amber-700 hover:bg-amber-600 text-white px-6 py-2 rounded-lg shadow-lg transition-colors"
+          >
+            儲存設定
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- === 歷史占卜紀錄彈窗 === -->
+    <div
+      id="historyModal"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 hidden backdrop-blur-md transition-opacity duration-300 opacity-0"
+    >
+      <div
+        class="bg-slate-900 border border-amber-500/50 rounded-xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col transform scale-95 transition-transform duration-300 mx-4"
+      >
+        <div
+          class="p-6 border-b border-amber-500/30 flex justify-between items-center"
+        >
+          <h2 class="text-2xl gold-text flex items-center">
+            <svg
+              class="w-6 h-6 mr-2"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+              ></path>
+            </svg>
+            歷史占卜紀錄
+          </h2>
+          <button
+            onclick="closeHistory()"
+            class="text-gray-400 hover:text-white transition-colors"
+          >
+            <svg
+              class="w-6 h-6"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M6 18L18 6M6 6l12 12"
+              ></path>
+            </svg>
+          </button>
+        </div>
+
+        <div class="p-6 overflow-y-auto flex-1 custom-scrollbar">
+          <div id="historyListContainer" class="space-y-6">
+            <p class="text-center text-gray-500 py-10">
+              尚無占卜紀錄，讓命運之輪開始轉動吧。
+            </p>
+          </div>
+        </div>
+
+        <div
+          class="p-6 border-t border-amber-500/30 bg-black/20 flex justify-between gap-3"
+        >
+          <button
+            onclick="clearHistory()"
+            class="px-5 py-2 rounded-lg text-red-400 hover:text-red-300 hover:bg-red-900/20 transition-colors"
+          >
+            清除全部紀錄
+          </button>
+          <button
+            onclick="closeHistory()"
+            class="bg-gray-700 hover:bg-gray-600 text-white px-6 py-2 rounded-lg transition-colors"
+          >
+            關閉
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // === 22 張大阿爾克那牌庫定義 ===
+      const majorArcana = [
+        {
+          id: 0,
+          name: "愚人",
+          en: "The Fool",
+          defaultUrl: "塔羅牌/00-愚人.jpg",
+        },
+        {
+          id: 1,
+          name: "魔術師",
+          en: "The Magician",
+          defaultUrl: "塔羅牌/01-魔術師.jpg",
+        },
+        {
+          id: 2,
+          name: "女祭師",
+          en: "The High Priestess",
+          defaultUrl: "塔羅牌/02-女祭師.jpg",
+        },
+        {
+          id: 3,
+          name: "皇后",
+          en: "The Empress",
+          defaultUrl: "塔羅牌/03-皇后.jpg",
+        },
+        {
+          id: 4,
+          name: "國王",
+          en: "The Emperor",
+          defaultUrl: "塔羅牌/04-國王.jpg",
+        },
+        {
+          id: 5,
+          name: "教皇",
+          en: "The Hierophant",
+          defaultUrl: "塔羅牌/05-教皇.jpg",
+        },
+        {
+          id: 6,
+          name: "戀人",
+          en: "The Lovers",
+          defaultUrl: "塔羅牌/06-戀人.jpg",
+        },
+        {
+          id: 7,
+          name: "戰車",
+          en: "The Chariot",
+          defaultUrl: "塔羅牌/07-戰車.jpg",
+        },
+        {
+          id: 8,
+          name: "力量",
+          en: "Strength",
+          defaultUrl: "塔羅牌/08-力量.jpg",
+        },
+        {
+          id: 9,
+          name: "隱者",
+          en: "The Hermit",
+          defaultUrl: "塔羅牌/09-隱者.jpg",
+        },
+        {
+          id: 10,
+          name: "命運之輪",
+          en: "Wheel of Fortune",
+          defaultUrl: "塔羅牌/10-命運之輪.jpg",
+        },
+        {
+          id: 11,
+          name: "正義",
+          en: "Justice",
+          defaultUrl: "塔羅牌/11-正義.jpg",
+        },
+        {
+          id: 12,
+          name: "吊人",
+          en: "The Hanged Man",
+          defaultUrl: "塔羅牌/12-吊人.jpg",
+        },
+        { id: 13, name: "死神", en: "Death", defaultUrl: "塔羅牌/13-死神.jpg" },
+        {
+          id: 14,
+          name: "節制",
+          en: "Temperance",
+          defaultUrl: "塔羅牌/14-節制.jpg",
+        },
+        {
+          id: 15,
+          name: "惡魔",
+          en: "The Devil",
+          defaultUrl: "塔羅牌/15-惡魔.jpg",
+        },
+        { id: 16, name: "塔", en: "The Tower", defaultUrl: "塔羅牌/16-塔.jpg" },
+        {
+          id: 17,
+          name: "星星",
+          en: "The Star",
+          defaultUrl: "塔羅牌/17-星星.jpg",
+        },
+        {
+          id: 18,
+          name: "月亮",
+          en: "The Moon",
+          defaultUrl: "塔羅牌/18-月亮.jpg",
+        },
+        {
+          id: 19,
+          name: "太陽",
+          en: "The Sun",
+          defaultUrl: "塔羅牌/19-太陽.jpg",
+        },
+        {
+          id: 20,
+          name: "審判",
+          en: "Judgement",
+          defaultUrl: "塔羅牌/20-審判.jpg",
+        },
+        {
+          id: 21,
+          name: "世界",
+          en: "The World",
+          defaultUrl: "塔羅牌/21-世界.jpg",
+        },
+      ];
+
+      // === 牌陣模式設定 ===
+      const spreadConfigs = {
+        timeline: {
+          name: "時間之流（過去・現在・未來）",
+          positions: ["過去", "現在", "未來"],
+          descriptions: [
+            "事情的根源、已發生的背景與累積的能量",
+            "當下的處境、眼前的核心狀態與挑戰",
+            "順著目前趨勢發展下去的走向與結果",
+          ],
+        },
+        causality: {
+          name: "事件剖析（原因・結果・建議）",
+          positions: ["原因", "結果", "建議"],
+          descriptions: [
+            "引發此問題的潛在成因或核心關鍵",
+            "目前發展趨勢下最可能呈現的局面",
+            "宇宙給予你的行動方針與破局指引",
+          ],
+        },
+      };
+
+      // === 全域狀態變數 ===
+      let customImages = {};
+      let userApiKey = "";
+      let readingHistory = [];
+      let currentReadingData = null;
+
+      // 三張牌的當局狀態
+      let isSpreadReady = false; // 是否已洗牌完畢等待翻牌
+      let isReadingInProgress = false; // 是否正在呼叫 AI 或打字中
+      let drawnSpread = []; // 存放 3 張抽出的牌物件 { card, isReversed, isFlipped, positionLabel }
+
+      // === 初始化 ===
+      function init() {
+        try {
+          const savedImages = localStorage.getItem("tarotCustomImages");
+          if (savedImages) customImages = JSON.parse(savedImages);
+
+          const savedKey = localStorage.getItem("tarotApiKey");
+          if (savedKey) userApiKey = savedKey;
+
+          const savedHistory = localStorage.getItem("tarotHistory");
+          if (savedHistory) readingHistory = JSON.parse(savedHistory);
+        } catch (e) {
+          console.error("無法讀取本地設定", e);
+        }
+
+        populateSettings();
+        populateManualSelects();
+        updateSpreadLabels();
+      }
+
+      // 填充三組手動指定下拉選單
+      function populateManualSelects() {
+        for (let i = 0; i < 3; i++) {
+          const selectEl = document.getElementById(`manualCard${i}`);
+          majorArcana.forEach((card) => {
+            const option = document.createElement("option");
+            option.value = card.id;
+            option.textContent = `${card.id}. ${card.name} (${card.en})`;
+            selectEl.appendChild(option);
+          });
+        }
+      }
+
+      // 切換進階指定選單顯示/隱藏
+      function toggleManualPanel() {
+        const panel = document.getElementById("manualPanel");
+        const icon = document.getElementById("manualToggleIcon");
+        if (panel.classList.contains("hidden")) {
+          panel.classList.remove("hidden");
+          icon.textContent = "▲ 收合";
+        } else {
+          panel.classList.add("hidden");
+          icon.textContent = "▼ 展開";
+        }
+      }
+
+      // 依據選擇的牌陣模式更新牌位標籤
+      function updateSpreadLabels() {
+        const type = document.getElementById("spreadType").value;
+        const positions = spreadConfigs[type].positions;
+        for (let i = 0; i < 3; i++) {
+          document.getElementById(`posBadge${i}`).textContent = positions[i];
+          document.getElementById(`manualLabel${i}`).textContent =
+            `${i + 1}. ${positions[i]}：`;
+        }
+      }
+
+      // === 訊息彈窗控制 ===
+      function showMessage(text) {
+        const messageBox = document.getElementById("messageBox");
+        document.getElementById("messageText").textContent = text;
+        messageBox.classList.remove("hidden");
+        void messageBox.offsetWidth;
+        messageBox.classList.remove("opacity-0");
+        messageBox.querySelector("div").classList.remove("scale-95");
+      }
+
+      function closeMessage() {
+        const messageBox = document.getElementById("messageBox");
+        messageBox.classList.add("opacity-0");
+        messageBox.querySelector("div").classList.add("scale-95");
+        setTimeout(() => messageBox.classList.add("hidden"), 300);
+      }
+
+      // === 系統設定彈窗 ===
+      function populateSettings() {
+        document.getElementById("apiKeyInput").value = userApiKey;
+        const settingsList = document.getElementById("settingsList");
+        settingsList.innerHTML = "";
+
+        majorArcana.forEach((card) => {
+          const val = customImages[card.id] || "";
+          const item = document.createElement("div");
+          item.className =
+            "flex flex-col sm:flex-row sm:items-center gap-3 bg-black/40 p-3 rounded-lg border border-gray-800";
+          item.innerHTML = `
+            <div class="w-full sm:w-1/3 shrink-0">
+              <span class="text-amber-200 font-medium">${card.id}. ${card.name}</span>
+              <span class="text-xs text-gray-500 block">${card.en}</span>
+            </div>
+            <input type="text" id="setting-img-${card.id}" value="${val}" placeholder="圖片 URL (如 https://...)" 
+              class="w-full bg-slate-900 border border-gray-700 rounded-md p-2 text-sm text-gray-200 focus:outline-none focus:border-amber-500 transition-colors">
+          `;
+          settingsList.appendChild(item);
+        });
+      }
+
+      function openSettings() {
+        populateSettings();
+        const modal = document.getElementById("settingsModal");
+        modal.classList.remove("hidden");
+        void modal.offsetWidth;
+        modal.classList.remove("opacity-0");
+        modal.querySelector("div").classList.remove("scale-95");
+      }
+
+      function closeSettings() {
+        const modal = document.getElementById("settingsModal");
+        modal.classList.add("opacity-0");
+        modal.querySelector("div").classList.add("scale-95");
+        setTimeout(() => modal.classList.add("hidden"), 300);
+      }
+
+      function saveSettings() {
+        userApiKey = document.getElementById("apiKeyInput").value.trim();
+        majorArcana.forEach((card) => {
+          const input = document.getElementById(`setting-img-${card.id}`);
+          if (input && input.value.trim() !== "") {
+            customImages[card.id] = input.value.trim();
+          } else {
+            delete customImages[card.id];
+          }
+        });
+
+        try {
+          localStorage.setItem("tarotApiKey", userApiKey);
+          localStorage.setItem(
+            "tarotCustomImages",
+            JSON.stringify(customImages),
+          );
+        } catch (e) {
+          console.error("儲存設定失敗", e);
+        }
+        closeSettings();
+        showMessage("系統設定已成功儲存！");
+      }
+
+      // === 歷史紀錄彈窗 ===
+      function openHistory() {
+        const listContainer = document.getElementById("historyListContainer");
+        listContainer.innerHTML = "";
+
+        if (readingHistory.length === 0) {
+          listContainer.innerHTML = `<p class="text-center text-gray-500 py-10">尚無占卜紀錄，讓命運之輪開始轉動吧。</p>`;
+        } else {
+          const reversedHistory = [...readingHistory].reverse();
+          reversedHistory.forEach((record) => {
+            const div = document.createElement("div");
+            div.className =
+              "bg-black/50 border border-gray-700 rounded-lg p-4 relative";
+            // 兼容舊版單張紀錄與新版三牌陣紀錄
+            const cardsSummary = record.cardsSummary
+              ? record.cardsSummary
+              : `${record.card} (${record.orientation})`;
+            const spreadBadge = record.spreadName
+              ? `<span class="text-xs bg-amber-900/50 text-amber-200 px-2 py-0.5 rounded border border-amber-500/30 mr-2">${record.spreadName}</span>`
+              : "";
+
+            div.innerHTML = `
+              <div class="flex flex-wrap justify-between items-start gap-2 mb-2">
+                <div>${spreadBadge}<span class="text-amber-400 font-bold text-sm">${cardsSummary}</span></div>
+                <span class="text-xs text-gray-500">${record.time}</span>
+              </div>
+              <p class="text-sm text-amber-100 mb-3 border-b border-gray-700 pb-2">Q: ${record.question}</p>
+              <div class="text-gray-300 text-sm whitespace-pre-wrap leading-relaxed">${record.result}</div>
+            `;
+            listContainer.appendChild(div);
+          });
+        }
+
+        const modal = document.getElementById("historyModal");
+        modal.classList.remove("hidden");
+        void modal.offsetWidth;
+        modal.classList.remove("opacity-0");
+        modal.querySelector("div").classList.remove("scale-95");
+      }
+
+      function closeHistory() {
+        const modal = document.getElementById("historyModal");
+        modal.classList.add("opacity-0");
+        modal.querySelector("div").classList.add("scale-95");
+        setTimeout(() => modal.classList.add("hidden"), 300);
+      }
+
+      function clearHistory() {
+        if (confirm("確定要清除所有歷史占卜紀錄嗎？此動作無法復原。")) {
+          readingHistory = [];
+          localStorage.removeItem("tarotHistory");
+          openHistory();
+        }
+      }
+
+      function getCardImage(card) {
+        return customImages[card.id] ? customImages[card.id] : card.defaultUrl;
+      }
+
+      // === 第一階段：洗牌並準備三張牌（等待使用者親自點擊翻牌） ===
+      async function prepareSpread() {
+        if (isReadingInProgress) return;
+
+        if (!userApiKey) {
+          showMessage(
+            "請先點擊右上角「系統設定」輸入您的 Gemini API 金鑰，才能啟動靈性解讀。",
+          );
+          return;
+        }
+
+        const question = document.getElementById("question").value.trim();
+        if (!question) {
+          showMessage("請先輸入你想探索的問題，讓宇宙感受到你的意圖。");
+          document.getElementById("question").focus();
+          return;
+        }
+
+        // 檢查手動指定的牌是否有重複（實務上同一副塔羅牌不會抽到重複）
+        const chosenIds = [];
+        for (let i = 0; i < 3; i++) {
+          const val = document.getElementById(`manualCard${i}`).value;
+          if (val !== "random") {
+            const numId = parseInt(val, 10);
+            if (chosenIds.includes(numId)) {
+              showMessage(
+                "同一副塔羅牌陣中不能指定重複的牌面，請選擇不同的牌！",
+              );
+              return;
+            }
+            chosenIds.push(numId);
+          }
+        }
+
+        // 若上一局牌已翻開，先將三張牌蓋回背面
+        let needResetFlip = false;
+        for (let i = 0; i < 3; i++) {
+          const cardEl = document.getElementById(`tarotCard${i}`);
+          if (cardEl.classList.contains("is-flipped")) {
+            cardEl.classList.remove("is-flipped");
+            needResetFlip = true;
+          }
+        }
+        if (needResetFlip) {
+          await new Promise((r) => setTimeout(r, 500));
+        }
+
+        // 隱藏上一局的解讀區
+        document.getElementById("resultContainer").classList.add("hidden");
+        document.getElementById("downloadBtnContainer").classList.add("hidden");
+        document.getElementById("readingContent").innerHTML = "";
+
+        // 抽取三張不重複的牌
+        const spreadType = document.getElementById("spreadType").value;
+        const spreadInfo = spreadConfigs[spreadType];
+        const usedCardIds = new Set(chosenIds);
+        drawnSpread = [];
+
+        for (let i = 0; i < 3; i++) {
+          const manualCardVal = document.getElementById(`manualCard${i}`).value;
+          const manualOriVal = document.getElementById(
+            `manualOrientation${i}`,
+          ).value;
+
+          let selectedCard;
+          if (manualCardVal !== "random") {
+            selectedCard = majorArcana.find(
+              (c) => c.id === parseInt(manualCardVal, 10),
+            );
+          } else {
+            const availablePool = majorArcana.filter(
+              (c) => !usedCardIds.has(c.id),
+            );
+            selectedCard =
+              availablePool[Math.floor(Math.random() * availablePool.length)];
+            usedCardIds.add(selectedCard.id);
+          }
+
+          const isReversed =
+            manualOriVal === "random"
+              ? Math.random() < 0.5
+              : manualOriVal === "reversed";
+
+          drawnSpread.push({
+            index: i,
+            positionLabel: spreadInfo.positions[i],
+            positionDesc: spreadInfo.descriptions[i],
+            card: selectedCard,
+            isReversed: isReversed,
+            isFlipped: false,
+          });
+
+          // 預先將圖片與正逆位資料填入牌面 DOM（背面朝上時看不到）
+          const cardEl = document.getElementById(`tarotCard${i}`);
+          const backEl = document.getElementById(`cardBack${i}`);
+          const imgEl = document.getElementById(`cardImg${i}`);
+          const nameEl = document.getElementById(`cardNameDisplay${i}`);
+          const posEl = document.getElementById(`cardPositionDisplay${i}`);
+          const hintEl = document.getElementById(`tapHint${i}`);
+
+          imgEl.src = getCardImage(selectedCard);
+          nameEl.textContent = selectedCard.name;
+
+          if (isReversed) {
+            backEl.classList.add("is-reversed");
+            posEl.textContent = "Reversed (逆位)";
+            posEl.classList.remove("text-gray-300");
+            posEl.classList.add("text-red-400");
+          } else {
+            backEl.classList.remove("is-reversed");
+            posEl.textContent = "Upright (正位)";
+            posEl.classList.remove("text-red-400");
+            posEl.classList.add("text-gray-300");
+          }
+
+          // 開啟發光呼吸提示與點擊狀態
+          cardEl.classList.add("can-flip");
+          hintEl.classList.remove("hidden");
+        }
+
+        isSpreadReady = true;
+        updateStatusBanner(0);
+      }
+
+      // 更新右側上方引導橫幅文字
+      function updateStatusBanner(flippedCount) {
+        const banner = document.getElementById("spreadStatusBanner");
+        if (flippedCount === 0) {
+          banner.textContent =
+            "✨ 洗牌完成！請依序點擊三張牌翻開（已翻開 0 / 3 張）";
+          banner.className =
+            "mb-6 px-5 py-2.5 rounded-full bg-amber-900/70 border border-amber-400 text-amber-100 text-sm text-center shadow-lg animate-pulse";
+        } else if (flippedCount < 3) {
+          banner.textContent = `🔮 請繼續點擊翻開剩餘牌面（已翻開 ${flippedCount} / 3 張）`;
+        } else {
+          banner.textContent = "🌟 三張牌已全數揭曉，星界正在為你連結解讀...";
+          banner.className =
+            "mb-6 px-5 py-2.5 rounded-full bg-purple-950/80 border border-amber-400/60 text-amber-200 text-sm text-center shadow-lg";
+        }
+      }
+
+      // === 第二階段：使用者親自點擊翻牌 ===
+      async function handleCardClick(index) {
+        // 若尚未按下洗牌按鈕，引導先輸入問題
+        if (!isSpreadReady) {
+          const q = document.getElementById("question").value.trim();
+          if (!q) {
+            showMessage("請先在左側輸入你的問題，並點擊「開始洗牌與佈陣」。");
+            document.getElementById("question").focus();
+          } else {
+            showMessage("請先點擊左側「開始洗牌與佈陣」按鈕來抽出三張牌。");
+          }
+          return;
+        }
+
+        const slot = drawnSpread[index];
+        if (!slot || slot.isFlipped || isReadingInProgress) return;
+
+        // 執行翻牌
+        slot.isFlipped = true;
+        const cardEl = document.getElementById(`tarotCard${index}`);
+        const hintEl = document.getElementById(`tapHint${index}`);
+
+        cardEl.classList.remove("can-flip");
+        cardEl.classList.add("is-flipped");
+        hintEl.classList.add("hidden");
+
+        const flippedCount = drawnSpread.filter(
+          (item) => item.isFlipped,
+        ).length;
+        updateStatusBanner(flippedCount);
+
+        // 當三張牌全部翻開時，觸發 Gemini 綜合解讀
+        if (flippedCount === 3) {
+          isSpreadReady = false;
+          // 稍等 650ms 讓最後一張牌的翻轉動畫完成後再開始解讀
+          await new Promise((r) => setTimeout(r, 650));
+          await triggerThreeCardReading();
+        }
+      }
+
+      // === 第三階段：呼叫 Gemini API 進行三牌陣連貫解析 ===
+      async function triggerThreeCardReading() {
+        isReadingInProgress = true;
+        const drawBtn = document.getElementById("drawBtn");
+        drawBtn.disabled = true;
+        drawBtn.classList.add("opacity-50", "cursor-not-allowed");
+
+        const question = document.getElementById("question").value.trim();
+        const spreadType = document.getElementById("spreadType").value;
+        const spreadInfo = spreadConfigs[spreadType];
+
+        const resultContainer = document.getElementById("resultContainer");
+        const readingContent = document.getElementById("readingContent");
+        const loadingIndicator = document.getElementById("loadingIndicator");
+
+        document.getElementById("resultTitle").textContent =
+          `靈性解讀・${spreadInfo.name}`;
+        resultContainer.classList.remove("hidden");
+        readingContent.innerHTML = "";
+        loadingIndicator.classList.remove("hidden");
+
+        // 捲動到解讀區（特別是手機版體驗更順暢）
+        resultContainer.scrollIntoView({
+          behavior: "smooth",
+          block: "nearest",
+        });
+
+        // 組合三張牌資訊
+        const cardDescriptions = drawnSpread
+          .map((item, idx) => {
+            const ori = item.isReversed ? "逆位" : "正位";
+            return `第${idx + 1}張【${item.positionLabel}】（${item.positionDesc}）：${item.card.name} (${item.card.en}) - ${ori}`;
+          })
+          .join("\n");
+
+        const cardsSummaryStr = drawnSpread
+          .map(
+            (item) =>
+              `[${item.positionLabel}] ${item.card.name}(${item.isReversed ? "逆" : "正"})`,
+          )
+          .join(" ｜ ");
+
+        const prompt = `使用者想問的問題：「${question}」
+使用的三牌陣類型：${spreadInfo.name}
+抽出的三張塔羅牌依序為：
+${cardDescriptions}
+
+請依據此三牌陣的位置含義、每張牌的牌義與正逆位狀態，以及三張牌之間的能量流動與關聯，為使用者進行深度且有同理心的解析。`;
+
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${userApiKey}`;
+        const payload = {
+          contents: [{ parts: [{ text: prompt }] }],
+          systemInstruction: {
+            parts: [
+              {
+                text: `你是一位充滿靈性、智慧且富有同理心的專業塔羅占卜師。請使用繁體中文（台灣用語）回應。
+解讀結構請清晰分段：
+1. **三牌陣能量總覽**（點出三張牌交織出的整體氛圍與核心課題）
+2. **逐張牌位深度解析**（依序針對「${spreadInfo.positions[0]}」、「${spreadInfo.positions[1]}」、「${spreadInfo.positions[2]}」三個位置結合牌義與正逆位切入問題核心）
+3. **星界指引與行動建議**（整合三張牌給出具體、溫暖且可執行的建議）
+回應中請善用 Markdown 粗體 (**關鍵詞**) 標示重點，語氣溫柔堅定，避免使用艱深晦澀的術語。`,
+              },
+            ],
+          },
+        };
+
+        try {
+          const response = await fetch(apiUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+
+          const result = await response.json();
+          loadingIndicator.classList.add("hidden");
+
+          if (
+            response.ok &&
+            result.candidates &&
+            result.candidates[0].content
+          ) {
+            const textResponse = result.candidates[0].content.parts[0].text;
+
+            // 儲存當次紀錄與歷史紀錄
+            const now = new Date();
+            const timeString = `${now.getFullYear()}/${(now.getMonth() + 1)
+              .toString()
+              .padStart(2, "0")}/${now
+              .getDate()
+              .toString()
+              .padStart(2, "0")} ${now
+              .getHours()
+              .toString()
+              .padStart(2, "0")}:${now
+              .getMinutes()
+              .toString()
+              .padStart(2, "0")}`;
+
+            currentReadingData = {
+              time: timeString,
+              spreadName: spreadInfo.name,
+              question: question,
+              cardsSummary: cardsSummaryStr,
+              cardsDetail: cardDescriptions,
+              result: textResponse.replace(/\*\*/g, ""),
+            };
+
+            readingHistory.push(currentReadingData);
+            localStorage.setItem(
+              "tarotHistory",
+              JSON.stringify(readingHistory),
+            );
+
+            document.getElementById("spreadStatusBanner").textContent =
+              "✨ 靈性解讀已完成，願星辰指引你的方向";
+
+            await typeWriterEffect(textResponse, readingContent, 20, () => {
+              document
+                .getElementById("downloadBtnContainer")
+                .classList.remove("hidden");
+            });
+          } else {
+            const errMsg = result.error ? result.error.message : "未知錯誤";
+            readingContent.innerHTML = `<span class="text-red-400">宇宙的訊號微弱，暫時無法解讀 (${errMsg})。請檢查您的 API 金鑰是否正確。</span>`;
+          }
+        } catch (error) {
+          loadingIndicator.classList.add("hidden");
+          readingContent.innerHTML =
+            '<span class="text-red-400">與星界連結中斷，請檢查網路狀態或金鑰是否正確。</span>';
+          console.error("API Call Failed:", error);
+        } finally {
+          isReadingInProgress = false;
+          drawBtn.disabled = false;
+          drawBtn.classList.remove("opacity-50", "cursor-not-allowed");
+        }
+      }
+
+      // === 打字機動態顯示效果 ===
+      async function typeWriterEffect(
+        text,
+        element,
+        speed = 20,
+        onComplete = null,
+      ) {
+        element.innerHTML = "";
+        const parsedText = text.replace(
+          /\*\*(.*?)\*\*/g,
+          '<strong class="gold-text">$1</strong>',
+        );
+        element.innerHTML = parsedText.replace(/\n/g, "<br>");
+        const tempDiv = document.createElement("div");
+        tempDiv.innerHTML = element.innerHTML;
+
+        const tokens = [];
+        let inTag = false,
+          currentTag = "";
+        const rawHTML = tempDiv.innerHTML;
+        for (let i = 0; i < rawHTML.length; i++) {
+          const char = rawHTML[i];
+          if (char === "<") {
+            inTag = true;
+            currentTag = char;
+          } else if (char === ">") {
+            inTag = false;
+            currentTag += char;
+            tokens.push({ type: "tag", val: currentTag });
+            currentTag = "";
+          } else if (inTag) {
+            currentTag += char;
+          } else {
+            tokens.push({ type: "char", val: char });
+          }
+        }
+
+        element.innerHTML = "";
+        let currentHTML = "";
+        for (let i = 0; i < tokens.length; i++) {
+          currentHTML += tokens[i].val;
+          element.innerHTML = currentHTML;
+          if (tokens[i].type === "char") {
+            await new Promise((r) =>
+              setTimeout(r, speed + (Math.random() * 12 - 4)),
+            );
+          }
+        }
+        if (onComplete) onComplete();
+      }
+
+      // === 下載本次占卜紀錄 (TXT) ===
+      function downloadCurrentRecord() {
+        if (!currentReadingData) return;
+
+        const content =
+          `====== Mystic Tarot 三牌陣占卜紀錄 ======\n` +
+          `時間：${currentReadingData.time}\n` +
+          `牌陣：${currentReadingData.spreadName}\n` +
+          `問題：${currentReadingData.question}\n` +
+          `----------------------------------------\n` +
+          `【抽牌結果】\n${currentReadingData.cardsDetail}\n` +
+          `========================================\n\n` +
+          `【靈性解讀】\n${currentReadingData.result}\n\n` +
+          `========================================\n` +
+          `願星辰指引你的道路 ✨`;
+
+        const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `塔羅三牌陣紀錄_${currentReadingData.time.replace(
+          /[\/:\s]/g,
+          "",
+        )}.txt`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }
+
+      window.addEventListener("DOMContentLoaded", init);
+    </script>
+  </body>
+</html>
