@@ -2654,6 +2654,9 @@
                   name: "✨ " + (data.name || baseName),
                   format: "blueprint",
                   parts: data.parts,
+                  animations: Array.isArray(data.animations)
+                    ? data.animations
+                    : [],
                 };
               } else if (data.buildings || data.natures) {
                 if (data.buildings) {
@@ -2925,6 +2928,17 @@
 
         function buildFromBlueprint(blueprint, mainColorHex, crystalColorHex) {
           const group = new THREE.Group();
+          const subGroups = {};
+
+          const purpleNeonMat = new THREE.MeshStandardMaterial({
+            color: 0xa855f7,
+            emissive: 0x9333ea,
+            emissiveIntensity: 0.45,
+            flatShading: true,
+            roughness: 0.2,
+          });
+          purpleNeonMat.userData.nightBoost = 2.6;
+          nightEmissiveMaterials.push(purpleNeonMat);
 
           const glowWhiteMat = new THREE.MeshStandardMaterial({
             color: 0xffffff,
@@ -2962,6 +2976,7 @@
               flatShading: true,
               roughness: 0.6,
             }),
+            purpleNeon: purpleNeonMat,
             white: new THREE.MeshStandardMaterial({
               color: 0xf8fafc,
               flatShading: true,
@@ -2994,23 +3009,76 @@
             let geo;
             const a = part.args || [1, 1, 1];
             if (part.shape === "cylinder")
-              geo = new THREE.CylinderGeometry(a[0], a[1], a[2], a[3] || 8);
+              geo = new THREE.CylinderGeometry(
+                part.args[0],
+                part.args[1],
+                part.args[2],
+                part.args[3] || 12,
+                part.args[4] || 1,
+                part.args[5] || false,
+                part.args[6] || 0,
+                part.args[7] || Math.PI * 2,
+              );
             else if (part.shape === "cone")
               geo = new THREE.ConeGeometry(a[0], a[1], a[2] || 8);
             else if (part.shape === "sphere")
               geo = new THREE.DodecahedronGeometry(a[0], 0);
             else geo = new THREE.BoxGeometry(a[0], a[1], a[2]);
 
-            const mat = materials[part.colorRole] || materials.main;
+            let mat = materials[part.colorRole] || materials.main;
+            // 若零件有設定 opacity（如夜間探照光束），複製材質並開啟半透明與夜間增亮
+            if (part.opacity !== undefined) {
+              mat = mat.clone();
+              mat.transparent = true;
+              mat.opacity = part.opacity;
+              mat.depthWrite = false;
+              if (mat.userData && mat.userData.nightBoost) {
+                nightEmissiveMaterials.push(mat);
+              }
+            }
+
             const mesh = new THREE.Mesh(geo, mat);
+            if (part.nightOnly) {
+              mesh.userData.nightOnly = true;
+            }
             if (part.pos)
               mesh.position.set(part.pos[0], part.pos[1], part.pos[2]);
             if (part.rot)
               mesh.rotation.set(part.rot[0], part.rot[1], part.rot[2]);
-            mesh.castShadow = true;
-            mesh.receiveShadow = true;
-            group.add(mesh);
+            mesh.castShadow = part.opacity === undefined;
+            mesh.receiveShadow = part.opacity === undefined;
+
+            // 若有指定 group 名稱，將零件放入對應子群組以便整體動畫控制
+            if (part.group) {
+              if (!subGroups[part.group]) {
+                subGroups[part.group] = new THREE.Group();
+                if (part.pivot) {
+                  subGroups[part.group].position.set(
+                    part.pivot[0],
+                    part.pivot[1],
+                    part.pivot[2],
+                  );
+                }
+                group.add(subGroups[part.group]);
+              }
+              subGroups[part.group].add(mesh);
+            } else {
+              group.add(mesh);
+            }
           });
+
+          // 註冊 JSON 中定義的動態動畫
+          (blueprint.animations || []).forEach(function (anim) {
+            const targetObj = anim.target ? subGroups[anim.target] : group;
+            if (targetObj) {
+              animatedProps.push({
+                type: "blueprintAnim",
+                obj: targetObj,
+                config: anim,
+              });
+            }
+          });
+
           return group;
         }
 
@@ -3632,6 +3700,14 @@
             mat.emissiveIntensity +=
               (targetGlow - mat.emissiveIntensity) * lerpFactor;
           });
+
+          // 夜間限定燈光與字樣（如 85 大樓紫光與 ARMY 字樣）自動開關
+          const showNightOnly = preset.nightGlow > 0.5;
+          scene.traverse(function (obj) {
+            if (obj.userData && obj.userData.nightOnly) {
+              obj.visible = showNightOnly;
+            }
+          });
         }
 
         /* =========================================================================
@@ -3886,6 +3962,975 @@
                 getResolvedTimeKey() === "night" ||
                 getResolvedTimeKey() === "sunset";
               item.beamMat.opacity = isDark ? 0.28 : 0.06;
+            } else if (item.type === "blueprintAnim") {
+              const cfg = item.config;
+              const dur = cfg.duration || 6.0;
+              const t = (elapsed % dur) / dur; // 0 ~ 1 循環進度
+
+              if (cfg.mode === "landing") {
+                // 階段 1 (0 ~ 0.55)：高空進場俯衝下降至跑道頭
+                // 階段 2 (0.55 ~ 0.90)：機身拉平、沿跑道減速滑行
+                // 階段 3 (0.90 ~ 1.0)：短暫隱身準備下一架次重來
+                if (t < 0.55) {
+                  const p = t / 0.55;
+                  item.obj.visible = true;
+                  item.obj.position.set(0, 1.35 * (1 - p), 1.05 * (1 - p));
+                  item.obj.rotation.x = 0.08 * (1 - p);
+                  item.obj.scale.setScalar(1);
+                } else if (t < 0.9) {
+                  const p = (t - 0.55) / 0.35;
+                  const easeOut = 1 - Math.pow(1 - p, 2);
+                  item.obj.visible = true;
+                  item.obj.position.set(0, 0, -1.35 * easeOut);
+                  item.obj.rotation.x = -0.18; // 抵銷原本進場俯衝角，讓機身在跑道上完全水平
+                  const shrink = p > 0.75 ? 1 - (p - 0.75) / 0.25 : 1;
+                  item.obj.scale.setScalar(Math.max(0.01, shrink));
+                } else {
+                  item.obj.visible = false;
+                }
+              } else if (cfg.mode === "spin") {
+                const axis = cfg.axis || "y";
+                item.obj.rotation[axis] += cfg.speed || 0.02;
+              } else if (cfg.mode === "bob") {
+                item.obj.position.y =
+                  Math.sin(elapsed * (cfg.speed || 2.5)) * (cfg.amp || 0.12);
+              } else if (cfg.mode === "archeryArrow") {
+                // 0.00 ~ 0.45：架在弓上慢慢向後拉滿弓（往 +Z 拉開 0.48 單位）
+                // 0.45 ~ 0.52：停頓瞄準紅心
+                // 0.52 ~ 0.64：離弦高速向前飛射至靶心（往 -Z 飛行 1.52 單位）
+                // 0.64 ~ 0.92：正中紅心（前段微震顫後穩穩插在靶心上）
+                // 0.92 ~ 1.00：隱身重置回弓上
+                if (t < 0.45) {
+                  const p = t / 0.45;
+                  const easeDraw = 1 - Math.pow(1 - p, 2);
+                  item.obj.visible = true;
+                  item.obj.position.set(0, 0, 0.48 * easeDraw);
+                  item.obj.rotation.set(0, 0, 0);
+                } else if (t < 0.52) {
+                  item.obj.visible = true;
+                  item.obj.position.set(0, 0, 0.48);
+                  item.obj.rotation.set(0, 0, 0);
+                } else if (t < 0.64) {
+                  const p = (t - 0.52) / 0.12;
+                  const zPos = 0.48 - 2.0 * p; // 從 +0.48 飛到 -1.52（精準插入靶心）
+                  const arcY = Math.sin(p * Math.PI) * 0.08; // 飛行拋物線微弧度
+                  item.obj.visible = true;
+                  item.obj.position.set(0, arcY, zPos);
+                  item.obj.rotation.x = Math.cos(p * Math.PI) * 0.06;
+                } else if (t < 0.92) {
+                  const hitTime = t - 0.64;
+                  const wobble =
+                    hitTime < 0.12
+                      ? Math.sin(hitTime * 110) * 0.04 * (1 - hitTime / 0.12)
+                      : 0;
+                  item.obj.visible = true;
+                  item.obj.position.set(0, 0, -1.52);
+                  item.obj.rotation.set(wobble, wobble * 0.6, 0);
+                } else {
+                  item.obj.visible = false;
+                }
+              } else if (cfg.mode === "archeryString") {
+                // 計算當前拉弓距離 pullDist（0 ~ 0.48），與 archeryArrow 完全同步
+                let pullDist = 0;
+                if (t < 0.45) {
+                  const p = t / 0.45;
+                  pullDist = 0.48 * (1 - Math.pow(1 - p, 2));
+                } else if (t < 0.52) {
+                  pullDist = 0.48;
+                } else if (t < 0.62) {
+                  const p = (t - 0.52) / 0.1;
+                  pullDist = Math.sin(p * Math.PI * 4) * 0.08 * (1 - p);
+                }
+
+                // 弓梢樞軸高度半徑 H = 0.795（上弓梢 y=1.655 至 箭高 y=0.86；下弓梢 y=0.065 至 0.86）
+                const H = 0.795;
+                const dir = cfg.side === "bottom" ? 1 : -1;
+                // 用勾股定理與 atan2 算出精準弦長與角度，確保弦端點永遠緊扣箭尾
+                const curLen = Math.hypot(H, pullDist);
+                item.obj.rotation.x = dir * Math.atan2(pullDist, H);
+                item.obj.scale.set(1, curLen / H, 1);
+              } else if (cfg.mode === "flameFlicker") {
+                // 爐火跳動：多頻率疊加產生不規則火舌伸縮與微微左右搖曳
+                const spd = cfg.speed || 9.0;
+                const ph = cfg.phase || 0;
+                const flickerY =
+                  1.0 +
+                  Math.sin(elapsed * spd + ph) * 0.24 +
+                  Math.cos(elapsed * (spd * 1.7) + ph) * 0.14;
+                const flickerXZ =
+                  1.0 + Math.cos(elapsed * (spd * 1.3) + ph) * 0.12;
+                item.obj.scale.set(
+                  flickerXZ,
+                  Math.max(0.45, flickerY),
+                  flickerXZ,
+                );
+                item.obj.rotation.z =
+                  Math.sin(elapsed * (spd * 0.8) + ph) * 0.08;
+              } else if (cfg.mode === "smokePuff") {
+                const p = (elapsed / dur + (cfg.phase || 0)) % 1;
+                if (p >= 0.94) {
+                  item.obj.visible = false;
+                } else {
+                  item.obj.visible = true;
+                  const tNorm = p / 0.94;
+                  // 單向緩慢上升（使用微減速曲線，越往上越輕盈緩慢）
+                  const easeRise = 1 - Math.pow(1 - tNorm, 1.35);
+                  const rise = (cfg.height || 0.95) * easeRise;
+                  const driftX =
+                    Math.sin(tNorm * Math.PI * 2 + (cfg.phase || 0) * 6) * 0.09;
+                  const driftZ = Math.cos(tNorm * Math.PI * 1.5) * 0.05;
+                  // 剛冒出時快速膨脹(0~0.2)，接著穩定上升並平滑縮小至消失(0.2~1.0)
+                  const s =
+                    tNorm < 0.2
+                      ? 0.45 + (tNorm / 0.2) * 0.65
+                      : 1.1 * (1 - (tNorm - 0.2) / 0.8);
+                  item.obj.position.set(
+                    -0.46 + driftX,
+                    1.8 + rise,
+                    -0.36 + driftZ,
+                  );
+                  item.obj.scale.setScalar(Math.max(0.01, s));
+                }
+              } else if (cfg.mode === "molePop") {
+                // 地鼠上下探頭伸縮：縮在洞內(0) -> 快速探出頭停留 -> 縮回洞內
+                const spd = cfg.speed || 2.8;
+                const ph = cfg.phase || 0;
+                const wave = Math.sin(elapsed * spd + ph);
+                // 僅在波峰期間探出，波谷期間躲在洞底，呈現錯落隨機感
+                const pop = Math.max(0, wave);
+                const easePop = Math.pow(pop, 0.75);
+                const maxLift = cfg.lift || 0.28;
+                item.obj.position.y = easePop * maxLift;
+                // 探出瞬間微幅拉長、縮回時微幅壓扁，增加 Q 彈卡通感
+                const stretch = 1 + easePop * 0.14;
+                const squash = 1 - easePop * 0.05;
+                item.obj.scale.set(squash, stretch, squash);
+              } else if (cfg.mode === "hammerSwing") {
+                // 木槌擺動揮擊：緩慢高舉蓄力 -> 快速向下砸擊敲打 -> 微彈回正
+                const p = (elapsed / dur + (cfg.phase || 0)) % 1;
+                let angle = 0;
+                if (p < 0.45) {
+                  // 0 ~ 0.45：向後高舉蓄力（-0.65 rad）
+                  const k = p / 0.45;
+                  angle = -0.65 * (1 - Math.pow(1 - k, 2));
+                } else if (p < 0.6) {
+                  // 0.45 ~ 0.60：快速向下揮擊砸下（+0.55 rad）
+                  const k = (p - 0.45) / 0.15;
+                  angle = -0.65 + 1.2 * (k * k);
+                } else if (p < 0.78) {
+                  // 0.60 ~ 0.78：敲中機台後的彈性反彈震動
+                  const k = (p - 0.6) / 0.18;
+                  angle = 0.55 * (1 - k) - Math.sin(k * Math.PI) * 0.18;
+                } else {
+                  angle = 0;
+                }
+                item.obj.rotation.x = angle;
+              } else if (cfg.mode === "gobbleJump") {
+                // 大圓柱雞套吃動作：
+                // 0.00 ~ 0.15：原地蓄力微蹲
+                // 0.15 ~ 0.45：拋物線高高跳起飛向目標小雞上方
+                // 0.45 ~ 0.58：垂直蓋下「套住吃掉」對方小雞並微震
+                // 0.58 ~ 0.90：停留在連線勝利位置（可微幅得意晃動）
+                // 0.90 ~ 1.00：隱身重置準備下一局
+                const p = (elapsed / dur + (cfg.phase || 0)) % 1;
+                const dx = cfg.dx || 0;
+                const dz = cfg.dz || 0;
+                const jumpH = cfg.jumpH || 0.72;
+
+                if (p < 0.15) {
+                  const k = p / 0.15;
+                  item.obj.visible = true;
+                  item.obj.position.set(0, -0.03 * Math.sin(k * Math.PI), 0);
+                  item.obj.scale.set(
+                    1 + 0.08 * Math.sin(k * Math.PI),
+                    1 - 0.1 * Math.sin(k * Math.PI),
+                    1 + 0.08 * Math.sin(k * Math.PI),
+                  );
+                  item.obj.rotation.set(0, 0, 0);
+                } else if (p < 0.45) {
+                  const k = (p - 0.15) / 0.3;
+                  const arcY = Math.sin(k * Math.PI) * jumpH;
+                  item.obj.visible = true;
+                  item.obj.position.set(dx * k, arcY, dz * k);
+                  item.obj.scale.set(0.95, 1.08, 0.95);
+                  item.obj.rotation.set(Math.sin(k * Math.PI) * 0.18, 0, 0);
+                } else if (p < 0.58) {
+                  const k = (p - 0.45) / 0.13;
+                  const slam = Math.sin(k * Math.PI);
+                  item.obj.visible = true;
+                  item.obj.position.set(dx, 0, dz);
+                  item.obj.scale.set(
+                    1 + 0.12 * slam,
+                    1 - 0.14 * slam,
+                    1 + 0.12 * slam,
+                  );
+                  item.obj.rotation.set(0, 0, 0);
+                } else if (p < 0.92) {
+                  const k = (p - 0.58) / 0.34;
+                  const cheer = Math.sin(k * Math.PI * 4) * 0.06;
+                  item.obj.visible = true;
+                  item.obj.position.set(dx, 0, dz);
+                  item.obj.scale.set(1, 1, 1);
+                  item.obj.rotation.set(0, 0, cheer);
+                } else {
+                  item.obj.visible = false;
+                }
+              } else if (cfg.mode === "gobbledHide") {
+                // 小圓柱雞在大雞蓋下瞬間（eatAt）被完整吞入消失，直到下一局重置
+                const p = (elapsed / dur + (cfg.phase || 0)) % 1;
+                const eatAt = cfg.eatAt || 0.46;
+                if (p < eatAt) {
+                  item.obj.visible = true;
+                  item.obj.scale.set(1, 1, 1);
+                } else if (p < 0.92) {
+                  item.obj.visible = false;
+                } else {
+                  item.obj.visible = false;
+                }
+              } else if (cfg.mode === "coinToss") {
+                const p = (elapsed / dur + (cfg.phase || 0)) % 1;
+                const baseX = cfg.baseX || 0;
+                const baseY = cfg.baseY || 0.365;
+                const baseZ = cfg.baseZ || 0;
+                const peakH = cfg.peakH || 1.15;
+                const spins = cfg.spins || 5;
+                const faceOffset = cfg.faceUp ? 0 : Math.PI;
+                const spreadX = cfg.spreadX || 0;
+                const spreadZ = cfg.spreadZ || 0;
+
+                if (p < 0.12) {
+                  const k = p / 0.12;
+                  const jitter = Math.sin(k * Math.PI * 6) * 0.03;
+                  item.obj.position.set(baseX + jitter, baseY, baseZ);
+                  item.obj.rotation.set(0, 0, jitter * 2);
+                } else if (p < 0.52) {
+                  const k = (p - 0.12) / 0.4;
+                  const arcY = Math.sin(k * Math.PI) * peakH;
+                  const easeOut = 1 - Math.pow(1 - k, 1.5);
+                  item.obj.position.set(
+                    baseX + spreadX * easeOut,
+                    baseY + arcY,
+                    baseZ + spreadZ * easeOut,
+                  );
+                  item.obj.rotation.set(
+                    k * spins * Math.PI * 2 + faceOffset * k,
+                    k * Math.PI * 2,
+                    Math.sin(k * Math.PI) * 0.45,
+                  );
+                } else if (p < 0.66) {
+                  const k = (p - 0.52) / 0.14;
+                  const bounceY =
+                    Math.abs(Math.sin(k * Math.PI * 2)) * 0.14 * (1 - k);
+                  const wobble = Math.sin(k * Math.PI * 3) * 0.18 * (1 - k);
+                  item.obj.position.set(
+                    baseX + spreadX,
+                    baseY + bounceY,
+                    baseZ + spreadZ,
+                  );
+                  item.obj.rotation.set(faceOffset + wobble, 0, wobble * 0.6);
+                } else {
+                  item.obj.position.set(
+                    baseX + spreadX,
+                    baseY,
+                    baseZ + spreadZ,
+                  );
+                  item.obj.rotation.set(faceOffset, 0, 0);
+                }
+              } else if (cfg.mode === "pokerCard") {
+                // 德州撲克五張公牌（Flop 3張 -> 停頓 -> Turn 1張 -> 停頓 -> River 1張）：
+                // dealAt：開始發牌時間點（0~1）
+                // baseX/baseY/baseZ：牌面在桌中央的最終擺放座標
+                // deckX/deckZ：發牌盒（牌靴）起始位置
+                const p = (elapsed / dur + (cfg.phase || 0)) % 1;
+                const dealAt = cfg.dealAt || 0.08;
+                const flipDur = cfg.flipDur || 0.09;
+                const baseX = cfg.baseX || 0;
+                const baseY = cfg.baseY || 0.565;
+                const baseZ = cfg.baseZ || 0;
+                const deckX = cfg.deckX !== undefined ? cfg.deckX : -0.78;
+                const deckZ = cfg.deckZ !== undefined ? cfg.deckZ : -0.18;
+                const resetAt = 0.88;
+
+                if (p < dealAt) {
+                  // 尚未輪到此張公牌：藏於牌靴內
+                  item.obj.visible = false;
+                } else if (p < dealAt + flipDur) {
+                  // 發牌飛出並翻轉 180 度亮出花色正面（Z 軸翻轉：PI 為牌背朝上 -> 0 為牌面朝上）
+                  const k = (p - dealAt) / flipDur;
+                  const ease = 1 - Math.pow(1 - k, 2.2);
+                  const arcY = Math.sin(k * Math.PI) * 0.16;
+                  item.obj.visible = true;
+                  item.obj.position.set(
+                    deckX + (baseX - deckX) * ease,
+                    baseY + arcY,
+                    deckZ + (baseZ - deckZ) * ease,
+                  );
+                  item.obj.rotation.set(
+                    0,
+                    (1 - ease) * 0.35,
+                    Math.PI * (1 - ease),
+                  );
+                } else if (p < resetAt) {
+                  // 翻開後平貼於綠絨桌面展示
+                  item.obj.visible = true;
+                  item.obj.position.set(baseX, baseY, baseZ);
+                  item.obj.rotation.set(0, 0, 0);
+                } else {
+                  // 0.88 ~ 1.00：收牌歸位準備下一局
+                  const k = (p - resetAt) / (1 - resetAt);
+                  item.obj.visible = k < 0.75;
+                  item.obj.position.set(
+                    baseX + (deckX - baseX) * k,
+                    baseY + Math.sin(k * Math.PI) * 0.06,
+                    baseZ + (deckZ - baseZ) * k,
+                  );
+                  item.obj.rotation.set(0, 0, Math.PI * k);
+                }
+              } else if (cfg.mode === "mahjongDiscard") {
+                // 四家輪流打牌（丟入牌河）：
+                // 0.00 ~ dropAt：藏於手牌後方尚未打出
+                // dropAt ~ dropAt + 0.08：從該家手牌位置劃弧線飛入牌河中央（牌面朝上）
+                // dropAt + 0.08 ~ 0.90：穩定排列在牌河中
+                // 0.90 ~ 1.00：收牌洗牌重置
+                const p = (elapsed / dur + (cfg.phase || 0)) % 1;
+                const dropAt = cfg.dropAt || 0.1;
+                const flyDur = 0.08;
+                const fromX = cfg.fromX || 0;
+                const fromZ = cfg.fromZ || 0.56;
+                const toX = cfg.toX || 0;
+                const toZ = cfg.toZ || 0.16;
+                const baseY = cfg.baseY || 0.562;
+                const resetAt = 0.9;
+
+                if (p < dropAt) {
+                  item.obj.visible = false;
+                } else if (p < dropAt + flyDur) {
+                  const k = (p - dropAt) / flyDur;
+                  const ease = 1 - Math.pow(1 - k, 2);
+                  const arcY = Math.sin(k * Math.PI) * 0.18;
+                  item.obj.visible = true;
+                  item.obj.position.set(
+                    fromX + (toX - fromX) * ease,
+                    baseY + arcY,
+                    fromZ + (toZ - fromZ) * ease,
+                  );
+                  item.obj.rotation.set(0, cfg.rotY || 0, 0);
+                } else if (p < resetAt) {
+                  item.obj.visible = true;
+                  item.obj.position.set(toX, baseY, toZ);
+                  item.obj.rotation.set(0, cfg.rotY || 0, 0);
+                } else {
+                  item.obj.visible = false;
+                }
+              } else if (cfg.mode === "mahjongPushDown") {
+                // 四家手牌於胡牌瞬間（pushAt）整排向前推倒亮牌：
+                // 0.00 ~ pushAt：直立擺放於各家門前（微幅呼吸/理牌感）
+                // pushAt ~ pushAt + 0.07：繞自身底邊向牌桌中央傾倒 90 度亮出花色
+                // pushAt + 0.07 ~ 0.90：保持平躺亮牌展示（自摸贏家可微幅彈跳慶祝）
+                // 0.90 ~ 1.00：收牌洗牌，準備下一圈
+                const p = (elapsed / dur + (cfg.phase || 0)) % 1;
+                const pushAt = cfg.pushAt || 0.62;
+                const fallDur = 0.07;
+                const resetAt = 0.9;
+                const baseX = cfg.baseX || 0;
+                const baseY = cfg.baseY || 0.545;
+                const baseZ = cfg.baseZ || 0;
+                const axis = cfg.tiltAxis || "x"; // "x" 為南北家前後傾倒，"z" 為東西家左右傾倒
+                const dir = cfg.tiltDir || -1; // 傾倒方向（+1 或 -1）
+
+                item.obj.visible = true;
+                item.obj.position.set(baseX, baseY, baseZ);
+                item.obj.rotation.set(0, 0, 0);
+
+                if (p < pushAt) {
+                  // 直立待機
+                  item.obj.rotation.set(0, 0, 0);
+                } else if (p < pushAt + fallDur) {
+                  // 順暢推倒 90 度（Math.PI / 2）
+                  const k = (p - pushAt) / fallDur;
+                  const ease = k * k;
+                  const angle = dir * (Math.PI / 2) * ease;
+                  if (axis === "x") item.obj.rotation.x = angle;
+                  else item.obj.rotation.z = angle;
+                } else if (p < resetAt) {
+                  // 完全推倒平躺亮出牌面
+                  const angle = dir * (Math.PI / 2);
+                  if (axis === "x") item.obj.rotation.x = angle;
+                  else item.obj.rotation.z = angle;
+                } else {
+                  // 洗牌收起瞬間隱藏
+                  item.obj.visible = false;
+                }
+              } else if (cfg.mode === "chessAttack") {
+                // 象棋捉對廝殺進攻動畫（支持多段座標 steps 依序推進吃子）：
+                // 每一段於 moveAt 啟動：先微抬蓄勢 -> 越河飛撲 -> 狠狠拍落吃子產生震動回饋
+                const p = (elapsed / dur + (cfg.phase || 0)) % 1;
+                const resetAt = 0.9;
+                const baseY = cfg.baseY || 0.255;
+                const jumpH = cfg.jumpH || 0.28;
+                const steps = cfg.steps || [
+                  { moveAt: 0.12, fromX: 0, fromZ: 0.48, toX: 0, toZ: -0.16 },
+                ];
+
+                item.obj.visible = true;
+                item.obj.rotation.set(0, 0, 0);
+                item.obj.scale.set(1, 1, 1);
+
+                if (p >= resetAt) {
+                  // 0.90 ~ 1.00：收子歸位重置
+                  const first = steps[0];
+                  item.obj.position.set(first.fromX, baseY, first.fromZ);
+                } else {
+                  let activeStep = null;
+                  let curX = steps[0].fromX;
+                  let curZ = steps[0].fromZ;
+
+                  for (let i = 0; i < steps.length; i++) {
+                    const s = steps[i];
+                    const moveDur = s.moveDur || 0.12;
+                    if (p < s.moveAt) {
+                      curX = s.fromX;
+                      curZ = s.fromZ;
+                      break;
+                    } else if (p < s.moveAt + moveDur) {
+                      activeStep = s;
+                      break;
+                    } else {
+                      curX = s.toX;
+                      curZ = s.toZ;
+                    }
+                  }
+
+                  if (activeStep) {
+                    const moveDur = activeStep.moveDur || 0.12;
+                    const k = (p - activeStep.moveAt) / moveDur;
+                    const ease =
+                      k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+                    const arcY = Math.sin(k * Math.PI) * jumpH;
+                    // 落地瞬間（k > 0.85）產生拍桌壓扁回彈感
+                    const slam =
+                      k > 0.85 ? Math.sin(((k - 0.85) / 0.15) * Math.PI) : 0;
+                    item.obj.position.set(
+                      activeStep.fromX +
+                        (activeStep.toX - activeStep.fromX) * ease,
+                      baseY + arcY,
+                      activeStep.fromZ +
+                        (activeStep.toZ - activeStep.fromZ) * ease,
+                    );
+                    item.obj.rotation.x =
+                      Math.sin(k * Math.PI) *
+                      (activeStep.toZ < activeStep.fromZ ? -0.22 : 0.22);
+                    item.obj.scale.set(
+                      1 + 0.1 * slam,
+                      1 - 0.15 * slam,
+                      1 + 0.1 * slam,
+                    );
+                  } else {
+                    item.obj.position.set(curX, baseY, curZ);
+                  }
+                }
+              } else if (cfg.mode === "chessCaptured") {
+                // 被吃掉的棋子於 hitAt 瞬間受衝擊震飛退場，直到 0.90 下一局開始再重新出現
+                const p = (elapsed / dur + (cfg.phase || 0)) % 1;
+                const hitAt = cfg.hitAt || 0.22;
+                const resetAt = 0.9;
+                const baseX = cfg.baseX || 0;
+                const baseY = cfg.baseY || 0.255;
+                const baseZ = cfg.baseZ || 0;
+
+                if (p < hitAt) {
+                  item.obj.visible = true;
+                  item.obj.position.set(baseX, baseY, baseZ);
+                  item.obj.rotation.set(0, 0, 0);
+                  item.obj.scale.set(1, 1, 1);
+                } else if (p < hitAt + 0.06) {
+                  // 受擊彈飛退場
+                  const k = (p - hitAt) / 0.06;
+                  item.obj.visible = true;
+                  item.obj.position.set(
+                    baseX + k * 0.18,
+                    baseY + k * 0.25,
+                    baseZ + (cfg.knockZ || -0.25) * k,
+                  );
+                  item.obj.rotation.set(k * 2.5, 0, k * 2.0);
+                  item.obj.scale.setScalar(1 - k * 0.8);
+                } else if (p < resetAt) {
+                  item.obj.visible = false;
+                } else {
+                  item.obj.visible = true;
+                  item.obj.position.set(baseX, baseY, baseZ);
+                  item.obj.rotation.set(0, 0, 0);
+                  item.obj.scale.set(1, 1, 1);
+                }
+              } else if (cfg.mode === "tarotCard") {
+                // 塔羅三張牌占卜（過去・現在・未來）：
+                // 0.00 ~ dealAt：蓋牌疊放於左側牌疊
+                // dealAt ~ dealAt + flipDur：帶魔法弧線飛向牌陣位置，繞 Z 軸翻轉 180 度亮出金色牌面
+                // dealAt + flipDur ~ resetAt：懸浮於占卜桌上方微微上下律動展示
+                // resetAt ~ 1.00：化光飛回牌疊重置
+                const p = (elapsed / dur + (cfg.phase || 0)) % 1;
+                const dealAt = cfg.dealAt || 0.12;
+                const flipDur = cfg.flipDur || 0.12;
+                const resetAt = 0.88;
+                const deckX = cfg.deckX !== undefined ? cfg.deckX : -0.68;
+                const deckY = cfg.deckY !== undefined ? cfg.deckY : 0.61;
+                const deckZ = cfg.deckZ !== undefined ? cfg.deckZ : 0.28;
+                const baseX = cfg.baseX || 0;
+                const baseY = cfg.baseY || 0.68;
+                const baseZ = cfg.baseZ || 0.18;
+                const tiltZ = cfg.tiltZ || 0; // 牌面展開時的扇形微傾角
+
+                if (p < dealAt) {
+                  item.obj.visible = true;
+                  item.obj.position.set(deckX, deckY, deckZ);
+                  item.obj.rotation.set(0, 0.25, Math.PI); // 牌背朝上
+                  item.obj.scale.set(0.9, 0.9, 0.9);
+                } else if (p < dealAt + flipDur) {
+                  const k = (p - dealAt) / flipDur;
+                  const ease = 1 - Math.pow(1 - k, 2.5);
+                  const arcY = Math.sin(k * Math.PI) * 0.28;
+                  item.obj.visible = true;
+                  item.obj.position.set(
+                    deckX + (baseX - deckX) * ease,
+                    deckY + (baseY - deckY) * ease + arcY,
+                    deckZ + (baseZ - deckZ) * ease,
+                  );
+                  // 空中螺旋翻牌亮出聖牌正面
+                  item.obj.rotation.set(
+                    Math.sin(k * Math.PI) * -0.35,
+                    (1 - ease) * Math.PI + tiltZ * ease,
+                    Math.PI * (1 - ease),
+                  );
+                  const pop = 1 + Math.sin(k * Math.PI) * 0.18;
+                  item.obj.scale.set(pop, pop, pop);
+                } else if (p < resetAt) {
+                  const hover = Math.sin((p - dealAt) * Math.PI * 10) * 0.016;
+                  item.obj.visible = true;
+                  item.obj.position.set(baseX, baseY + hover, baseZ);
+                  item.obj.rotation.set(-0.22, tiltZ, 0); // 微微前傾方便俯視觀賞
+                  item.obj.scale.set(1, 1, 1);
+                } else {
+                  const k = (p - resetAt) / (1 - resetAt);
+                  item.obj.visible = k < 0.8;
+                  item.obj.position.set(
+                    baseX + (deckX - baseX) * k,
+                    baseY + (deckY - baseY) * k + Math.sin(k * Math.PI) * 0.12,
+                    baseZ + (deckZ - baseZ) * k,
+                  );
+                  item.obj.rotation.set(0, tiltZ * (1 - k), Math.PI * k);
+                  item.obj.scale.setScalar(1 - k * 0.2);
+                }
+              } else if (cfg.mode === "tarotAura") {
+                // 塔羅占卜魔法特效（支援 3 種特效類型 effectType）：
+                // "ring"：翻牌落地瞬間向外擴散的星芒魔法光環
+                // "spark"：環繞聖牌與水晶球螺旋上升的星光微粒
+                // "orb"：占卜桌後方水晶球的核心脈動與自轉
+                const p = (elapsed / dur + (cfg.phase || 0)) % 1;
+                const type = cfg.effectType || "spark";
+                const baseX = cfg.baseX || 0;
+                const baseY = cfg.baseY || 0.62;
+                const baseZ = cfg.baseZ || 0.18;
+
+                if (type === "ring") {
+                  const triggerAt = cfg.triggerAt || 0.22;
+                  const ringDur = 0.2;
+                  if (p >= triggerAt && p < triggerAt + ringDur) {
+                    const k = (p - triggerAt) / ringDur;
+                    const ease = 1 - Math.pow(1 - k, 2);
+                    item.obj.visible = true;
+                    item.obj.position.set(baseX, baseY + k * 0.06, baseZ);
+                    item.obj.rotation.y = k * Math.PI * 1.5;
+                    const s = 0.2 + ease * 1.35;
+                    item.obj.scale.set(s, Math.max(0.05, 1 - k), s);
+                  } else {
+                    item.obj.visible = false;
+                  }
+                } else if (type === "orb") {
+                  const pulse = 1 + Math.sin(elapsed * 4.5) * 0.12;
+                  item.obj.visible = true;
+                  item.obj.position.set(
+                    baseX,
+                    baseY + Math.sin(elapsed * 2.5) * 0.025,
+                    baseZ,
+                  );
+                  item.obj.rotation.set(
+                    elapsed * 0.8,
+                    elapsed * 1.6,
+                    elapsed * 0.5,
+                  );
+                  item.obj.scale.setScalar(pulse);
+                } else {
+                  // "spark" 螺旋飄升星塵
+                  const activeStart = cfg.activeStart || 0.14;
+                  const activeEnd = 0.88;
+                  if (p >= activeStart && p <= activeEnd) {
+                    const localP =
+                      ((p - activeStart) * 2.6 + (cfg.offset || 0)) % 1;
+                    const angle = localP * Math.PI * 4 + (cfg.angleOffset || 0);
+                    const radius = (cfg.radius || 0.14) * (1 - localP * 0.35);
+                    item.obj.visible = true;
+                    item.obj.position.set(
+                      baseX + Math.cos(angle) * radius,
+                      baseY + localP * 0.42,
+                      baseZ + Math.sin(angle) * radius,
+                    );
+                    item.obj.rotation.set(localP * 4, localP * 6, 0);
+                    const fade = Math.sin(localP * Math.PI);
+                    item.obj.scale.setScalar(Math.max(0.01, fade * 1.15));
+                  } else {
+                    item.obj.visible = false;
+                  }
+                }
+              } else if (cfg.mode === "filmCameraOrbit") {
+                // 電影攝影機圓弧滑軌環繞運鏡：
+                // 沿著半徑 radius 的弧形軌道（startAngle ~ endAngle）平滑推軌移動
+                // 並透過 atan2 讓鏡頭始終精準鎖定舞台中心 (lookX, lookZ)
+                const p = (elapsed / dur + (cfg.phase || 0)) % 1;
+                const startA =
+                  cfg.startAngle !== undefined ? cfg.startAngle : -0.95;
+                const endA = cfg.endAngle !== undefined ? cfg.endAngle : 0.95;
+                const r = cfg.radius || 0.78;
+                const centerX = cfg.centerX || 0;
+                const centerZ = cfg.centerZ || -0.05;
+                const lookX = cfg.lookX !== undefined ? cfg.lookX : 0;
+                const lookZ = cfg.lookZ !== undefined ? cfg.lookZ : -0.08;
+                const baseY = cfg.baseY || 0.16;
+
+                let curAngle = startA;
+                if (p < 0.12) {
+                  // 0.00 ~ 0.12：開拍準備，鏡頭對準就位
+                  curAngle = startA;
+                } else if (p < 0.56) {
+                  // 0.12 ~ 0.56：順時針大弧度環繞運鏡
+                  const k = (p - 0.12) / 0.44;
+                  const ease =
+                    k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+                  curAngle = startA + (endA - startA) * ease;
+                } else if (p < 0.64) {
+                  // 0.56 ~ 0.64：特寫定格停頓
+                  curAngle = endA;
+                } else if (p < 0.94) {
+                  // 0.64 ~ 0.94：反向回推歸位
+                  const k = (p - 0.64) / 0.3;
+                  const ease =
+                    k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+                  curAngle = endA + (startA - endA) * ease;
+                } else {
+                  curAngle = startA;
+                }
+
+                const camX = centerX + Math.sin(curAngle) * r;
+                const camZ = centerZ + Math.cos(curAngle) * r;
+                item.obj.position.set(camX, baseY, camZ);
+                // 鏡頭前緣朝 -Z 方向，透過 atan2 讓攝影機永遠正對舞台中心
+                item.obj.rotation.y = Math.atan2(camX - lookX, camZ - lookZ);
+              } else if (cfg.mode === "actorBlocking") {
+                // 演員片場走位與對手戲（支援多段走位路徑 waypoints）：
+                // 移動時伴隨自然步行上下律動，抵達走位點後自動轉向對手並做出台詞/張力動作
+                const p = (elapsed / dur + (cfg.phase || 0)) % 1;
+                const baseY = cfg.baseY || 0.12;
+                const waypoints = cfg.waypoints || [
+                  {
+                    startAt: 0.14,
+                    moveDur: 0.16,
+                    fromX: -0.35,
+                    fromZ: -0.1,
+                    toX: -0.12,
+                    toZ: -0.12,
+                    faceY: 1.4,
+                  },
+                ];
+
+                let curX = waypoints[0].fromX;
+                let curZ = waypoints[0].fromZ;
+                let curFaceY =
+                  waypoints[0].initialFaceY !== undefined
+                    ? waypoints[0].initialFaceY
+                    : 1.57;
+                let bobY = 0;
+                let tiltX = 0;
+
+                if (p < waypoints[0].startAt) {
+                  // 開拍前站定位待機
+                  curX = waypoints[0].fromX;
+                  curZ = waypoints[0].fromZ;
+                } else if (p >= 0.92) {
+                  // 喊卡收工，走回起始位置
+                  const k = (p - 0.92) / 0.08;
+                  const last = waypoints[waypoints.length - 1];
+                  curX = last.toX + (waypoints[0].fromX - last.toX) * k;
+                  curZ = last.toZ + (waypoints[0].fromZ - last.toZ) * k;
+                  bobY = Math.abs(Math.sin(k * Math.PI * 3)) * 0.025;
+                } else {
+                  for (let i = 0; i < waypoints.length; i++) {
+                    const wp = waypoints[i];
+                    const moveDur = wp.moveDur || 0.15;
+                    if (p < wp.startAt) {
+                      break;
+                    } else if (p < wp.startAt + moveDur) {
+                      const k = (p - wp.startAt) / moveDur;
+                      const ease =
+                        k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+                      curX = wp.fromX + (wp.toX - wp.fromX) * ease;
+                      curZ = wp.fromZ + (wp.toZ - wp.fromZ) * ease;
+                      curFaceY = Math.atan2(
+                        wp.toX - wp.fromX,
+                        wp.toZ - wp.fromZ,
+                      );
+                      bobY = Math.abs(Math.sin(k * Math.PI * 4)) * 0.03;
+                      tiltX = 0.08;
+                      break;
+                    } else {
+                      curX = wp.toX;
+                      curZ = wp.toZ;
+                      curFaceY = wp.faceY !== undefined ? wp.faceY : curFaceY;
+                      // 定點對手戲肢體語言（微幅前傾激辯）
+                      const actPhase = (p - (wp.startAt + moveDur)) * 18;
+                      tiltX = Math.sin(actPhase) * 0.09;
+                      bobY = Math.abs(Math.sin(actPhase * 0.5)) * 0.012;
+                    }
+                  }
+                }
+
+                item.obj.position.set(curX, baseY + bobY, curZ);
+                item.obj.rotation.set(tiltX, curFaceY, 0);
+              } else if (cfg.mode === "clapperSnap") {
+                // 場記板開拍打板動畫：0.04 ~ 0.11 張開上板並清脆合上
+                const p = (elapsed / dur + (cfg.phase || 0)) % 1;
+                if (p >= 0.03 && p < 0.07) {
+                  const k = (p - 0.03) / 0.04;
+                  item.obj.rotation.z = k * 0.55;
+                } else if (p >= 0.07 && p < 0.1) {
+                  const k = (p - 0.07) / 0.03;
+                  item.obj.rotation.z = 0.55 * (1 - k * k);
+                } else {
+                  item.obj.rotation.z = 0;
+                }
+              } else if (cfg.mode === "spotlightTrack") {
+                // 片場探照燈追光與體積光束動畫（精準追蹤多段走位並動態伸縮光束長度）：
+                const p = (elapsed / dur + (cfg.phase || 0)) % 1;
+                const onAt = cfg.onAt || 0.08;
+                const offAt = cfg.offAt || 0.92;
+                const lampX = cfg.lampX || -0.76;
+                const lampY = cfg.lampY || 0.78;
+                const lampZ = cfg.lampZ || -0.54;
+                const waypoints = cfg.waypoints || [];
+
+                if (p < onAt || p >= offAt) {
+                  item.obj.visible = false;
+                } else {
+                  item.obj.visible = true;
+                  let targetX = cfg.defaultTargetX || 0;
+                  let targetZ = cfg.defaultTargetZ || -0.1;
+
+                  if (waypoints.length > 0) {
+                    targetX = waypoints[0].fromX;
+                    targetZ = waypoints[0].fromZ;
+                    for (let i = 0; i < waypoints.length; i++) {
+                      const wp = waypoints[i];
+                      const moveDur = wp.moveDur || 0.15;
+                      if (p < wp.startAt) {
+                        // 尚未開始此段移動，保持在上一段終點（或起點）
+                        break;
+                      } else if (p < wp.startAt + moveDur) {
+                        // 正在移動中：線性平滑插值追蹤
+                        const k = (p - wp.startAt) / moveDur;
+                        const ease =
+                          k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+                        targetX = wp.fromX + (wp.toX - wp.fromX) * ease;
+                        targetZ = wp.fromZ + (wp.toZ - wp.fromZ) * ease;
+                        break;
+                      } else {
+                        // 已完成此段移動：更新為此段終點，繼續檢查下一段
+                        targetX = wp.toX;
+                        targetZ = wp.toZ;
+                      }
+                    }
+                  }
+
+                  const dx = targetX - lampX;
+                  const dy = 0.14 - lampY; // 光斑精準落在演員腳下舞台面（y = 0.14）
+                  const dz = targetZ - lampZ;
+                  const horizDist = Math.sqrt(dx * dx + dz * dz);
+                  const dist3D = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+                  item.obj.position.set(lampX, lampY, lampZ);
+                  item.obj.rotation.order = "YXZ";
+                  item.obj.rotation.y = Math.atan2(dx, dz);
+                  item.obj.rotation.x = -Math.atan2(horizDist, -dy);
+
+                  // 依據燈箱到演員的實際 3D 距離動態伸縮光束長度（原始錐高 0.88）
+                  const lenScale = dist3D / 0.88;
+                  const flicker = 1 + Math.sin(elapsed * 24) * 0.015;
+                  item.obj.scale.set(flicker, lenScale, flicker);
+                }
+              } else if (cfg.mode === "droneSearch") {
+                // 無人機三種路徑依序搜尋（每次完成後自動降落停機坪）：
+                // 0.00 ~ 0.333：任務一「由中心向外螺旋搜尋」 -> 降落停機坪
+                // 0.333 ~ 0.666：任務二「星形路徑搜尋」 -> 降落停機坪
+                // 0.666 ~ 1.000：任務三「Z 字形拉網搜尋」 -> 降落停機坪
+                const p = (elapsed / dur + (cfg.phase || 0)) % 1;
+                const padX = cfg.padX !== undefined ? cfg.padX : -0.68;
+                const padY = cfg.padY !== undefined ? cfg.padY : 0.16;
+                const padZ = cfg.padZ !== undefined ? cfg.padZ : 0.64;
+                const flyY = cfg.flyY || 1.28;
+                const scanCone = item.obj.getObjectByName("scanCone");
+
+                // 單一任務時段切成 3 份，計算當前是第幾趟任務 (0: 螺旋, 1: 星形, 2: Z字)
+                const missionIdx = Math.min(2, Math.floor(p * 3));
+                const mp = p * 3 - missionIdx; // 單趟任務進度 0.0 ~ 1.0
+
+                let x = padX,
+                  y = padY,
+                  z = padZ;
+                let yaw = 0,
+                  pitch = 0,
+                  roll = 0;
+                let propSpeed = 0;
+                let scanning = false;
+
+                // 定義三種搜尋路徑的起點與路徑採樣函式 (localT: 0 -> 1)
+                const samplePath = (idx, t) => {
+                  if (idx === 0) {
+                    // 1. 由中心向外螺旋搜尋（Spiral Outward）
+                    const maxR = 0.72;
+                    const angle = t * Math.PI * 6; // 3 圈向外擴張螺旋
+                    const r = 0.04 + t * maxR;
+                    return { x: Math.cos(angle) * r, z: Math.sin(angle) * r };
+                  } else if (idx === 1) {
+                    // 2. 五角星形穿插搜尋（Star Pattern）
+                    const pts = [
+                      { x: 0.0, z: -0.74 },
+                      { x: 0.44, z: 0.62 },
+                      { x: -0.7, z: -0.22 },
+                      { x: 0.7, z: -0.22 },
+                      { x: -0.44, z: 0.62 },
+                      { x: 0.0, z: -0.74 },
+                    ];
+                    const segF = t * (pts.length - 1);
+                    const sIdx = Math.min(pts.length - 2, Math.floor(segF));
+                    const st = segF - sIdx;
+                    return {
+                      x: pts[sIdx].x + (pts[sIdx + 1].x - pts[sIdx].x) * st,
+                      z: pts[sIdx].z + (pts[sIdx + 1].z - pts[sIdx].z) * st,
+                    };
+                  } else {
+                    // 3. Z 字形拉網搜尋（Zigzag Sweep）
+                    const pts = [
+                      { x: -0.68, z: -0.62 },
+                      { x: 0.68, z: -0.62 },
+                      { x: -0.68, z: -0.2 },
+                      { x: 0.68, z: -0.2 },
+                      { x: -0.68, z: 0.22 },
+                      { x: 0.68, z: 0.22 },
+                      { x: -0.68, z: 0.62 },
+                      { x: 0.68, z: 0.62 },
+                    ];
+                    const segF = t * (pts.length - 1);
+                    const sIdx = Math.min(pts.length - 2, Math.floor(segF));
+                    const st = segF - sIdx;
+                    return {
+                      x: pts[sIdx].x + (pts[sIdx + 1].x - pts[sIdx].x) * st,
+                      z: pts[sIdx].z + (pts[sIdx + 1].z - pts[sIdx].z) * st,
+                    };
+                  }
+                };
+
+                const startPt = samplePath(missionIdx, 0);
+                const endPt = samplePath(missionIdx, 1);
+
+                if (mp < 0.06) {
+                  // 停機坪待機蓄能
+                  x = padX;
+                  y = padY;
+                  z = padZ;
+                  propSpeed = (mp / 0.06) * 18;
+                } else if (mp < 0.16) {
+                  // 垂直起飛並飛往搜尋路徑起點
+                  const k = (mp - 0.06) / 0.1;
+                  const ease =
+                    k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+                  x = padX + (startPt.x - padX) * ease;
+                  y = padY + (flyY - padY) * ease;
+                  z = padZ + (startPt.z - padZ) * ease;
+                  yaw = Math.atan2(startPt.x - padX, startPt.z - padZ);
+                  pitch = 0.16 * Math.sin(k * Math.PI);
+                  propSpeed = 38;
+                } else if (mp < 0.78) {
+                  // 執行該趟空中搜尋路徑並開啟下視掃描光束
+                  const t = (mp - 0.16) / 0.62;
+                  const cur = samplePath(missionIdx, t);
+                  const next = samplePath(missionIdx, Math.min(1, t + 0.015));
+                  const dx = next.x - cur.x;
+                  const dz = next.z - cur.z;
+                  x = cur.x;
+                  y = flyY + Math.sin(elapsed * 5) * 0.018;
+                  z = cur.z;
+                  if (Math.hypot(dx, dz) > 0.0005) {
+                    yaw = Math.atan2(dx, dz);
+                  }
+                  pitch = 0.14;
+                  roll = Math.sin(t * Math.PI * 6) * 0.06;
+                  propSpeed = 42;
+                  scanning = true;
+                } else if (mp < 0.9) {
+                  // 搜尋路徑完成，返航降落回停機坪
+                  const k = (mp - 0.78) / 0.12;
+                  const ease =
+                    k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+                  x = endPt.x + (padX - endPt.x) * ease;
+                  y = flyY + (padY - flyY) * ease;
+                  z = endPt.z + (padZ - endPt.z) * ease;
+                  yaw = Math.atan2(padX - endPt.x, padZ - endPt.z);
+                  pitch = -0.1 * Math.sin(k * Math.PI);
+                  propSpeed = 36 * (1 - k * 0.6);
+                } else {
+                  // 已平穩降落停機坪停靠
+                  x = padX;
+                  y = padY;
+                  z = padZ;
+                  propSpeed = 0;
+                }
+
+                item.obj.position.set(x, y, z);
+                item.obj.rotation.order = "YXZ";
+                item.obj.rotation.set(pitch, yaw, roll);
+
+                if (scanCone) {
+                  scanCone.visible = scanning;
+                  if (scanning) {
+                    const pulse = 1 + Math.sin(elapsed * 16) * 0.06;
+                    scanCone.scale.set(pulse, 1, pulse);
+                  }
+                }
+                // 帶動四顆旋翼葉片高速旋轉
+                item.obj.traverse((child) => {
+                  if (child.name === "rotorBlade" && propSpeed > 0) {
+                    child.rotation.y += propSpeed * 0.05;
+                  }
+                });
+              } else if (cfg.mode === "searchTargetCar") {
+                // 地面目標汽車沿基地道路巡航，供空中無人機搜尋偵察
+                const p = (elapsed / dur + (cfg.phase || 0)) % 1;
+                const roadPts = [
+                  { x: -0.52, z: -0.48 },
+                  { x: 0.52, z: -0.48 },
+                  { x: 0.52, z: 0.48 },
+                  { x: -0.18, z: 0.48 },
+                  { x: -0.18, z: -0.05 },
+                  { x: -0.52, z: -0.05 },
+                  { x: -0.52, z: -0.48 },
+                ];
+                const segF = p * (roadPts.length - 1);
+                const idx = Math.min(roadPts.length - 2, Math.floor(segF));
+                const t = segF - idx;
+                const p1 = roadPts[idx];
+                const p2 = roadPts[idx + 1];
+                const cx = p1.x + (p2.x - p1.x) * t;
+                const cz = p1.z + (p2.z - p1.z) * t;
+                item.obj.position.set(cx, cfg.baseY || 0.135, cz);
+                item.obj.rotation.y = Math.atan2(p2.x - p1.x, p2.z - p1.z);
+              }
             }
           });
 
