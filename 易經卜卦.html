@@ -1,0 +1,2203 @@
+<!doctype html>
+<html lang="zh-TW">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>易經・三枚銅板起卦與 AI 智慧解卦</title>
+    <style>
+      /* =========================================
+       1. 古典宣紙水墨風 CSS 變數與基礎設定
+       ========================================= */
+      :root {
+        --bg-paper: #f6f1e7;
+        --bg-card: #fcf9f2;
+        --bg-inset: #efe8d8;
+        --ink-primary: #22201e;
+        --ink-secondary: #57524b;
+        --ink-muted: #8a8277;
+        --cinnabar: #a62c2b;
+        --cinnabar-hover: #892120;
+        --bronze: #9c7a3c;
+        --border-ink: #d5cbb8;
+        --shadow-soft: 0 6px 20px rgba(34, 32, 30, 0.08);
+        --font-serif:
+          "Noto Serif TC", "PMingLiU", "MingLiU", "Songti TC", Georgia, serif;
+        --font-sans: "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        background-color: var(--bg-paper);
+        background-image:
+          radial-gradient(rgba(156, 122, 60, 0.06) 1px, transparent 0),
+          radial-gradient(rgba(34, 32, 30, 0.04) 1px, transparent 0);
+        background-size: 28px 28px;
+        background-position:
+          0 0,
+          14px 14px;
+        color: var(--ink-primary);
+        font-family: var(--font-serif);
+        line-height: 1.65;
+        min-height: 100vh;
+        padding-bottom: 60px;
+      }
+
+      .container {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 20px 16px;
+      }
+
+      /* =========================================
+       2. 頂部標題與導覽列
+       ========================================= */
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+        padding: 18px 24px;
+        background: var(--bg-card);
+        border: 1px solid var(--border-ink);
+        border-top: 4px solid var(--ink-primary);
+        border-radius: 6px;
+        box-shadow: var(--shadow-soft);
+        margin-bottom: 24px;
+      }
+
+      .title-group {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+
+      .seal-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 42px;
+        height: 42px;
+        border: 2px solid var(--cinnabar);
+        color: var(--cinnabar);
+        font-weight: bold;
+        font-size: 1.15rem;
+        border-radius: 4px;
+        letter-spacing: 1px;
+        flex-shrink: 0;
+        background: rgba(166, 44, 43, 0.04);
+      }
+
+      h1 {
+        font-size: 1.45rem;
+        letter-spacing: 2px;
+        color: var(--ink-primary);
+      }
+
+      .subtitle {
+        font-size: 0.85rem;
+        color: var(--ink-secondary);
+        font-family: var(--font-sans);
+      }
+
+      .header-actions {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+
+      /* =========================================
+       3. 通用按鈕與卡片元件
+       ========================================= */
+      .card {
+        background: var(--bg-card);
+        border: 1px solid var(--border-ink);
+        border-radius: 6px;
+        padding: 22px;
+        box-shadow: var(--shadow-soft);
+        margin-bottom: 24px;
+      }
+
+      .section-title {
+        font-size: 1.15rem;
+        font-weight: bold;
+        color: var(--ink-primary);
+        margin-bottom: 14px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid var(--border-ink);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .step-tag {
+        display: inline-block;
+        background: var(--ink-primary);
+        color: var(--bg-card);
+        font-size: 0.78rem;
+        padding: 2px 8px;
+        border-radius: 3px;
+        margin-right: 8px;
+        font-family: var(--font-sans);
+        vertical-align: middle;
+      }
+
+      button {
+        font-family: var(--font-sans);
+        cursor: pointer;
+        border-radius: 4px;
+        border: 1px solid var(--border-ink);
+        padding: 9px 16px;
+        font-size: 0.92rem;
+        transition: all 0.2s ease;
+        min-height: 42px;
+      }
+
+      button:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+
+      .btn-primary {
+        background: var(--cinnabar);
+        color: #fff;
+        border-color: var(--cinnabar);
+        font-weight: 600;
+      }
+
+      .btn-primary:hover:not(:disabled) {
+        background: var(--cinnabar-hover);
+      }
+
+      .btn-ink {
+        background: var(--ink-primary);
+        color: var(--bg-card);
+        border-color: var(--ink-primary);
+      }
+
+      .btn-ink:hover:not(:disabled) {
+        background: #3a3734;
+      }
+
+      .btn-outline {
+        background: transparent;
+        color: var(--ink-primary);
+        border-color: var(--ink-secondary);
+      }
+
+      .btn-outline:hover:not(:disabled) {
+        background: var(--bg-inset);
+      }
+
+      .btn-sm {
+        padding: 5px 10px;
+        font-size: 0.82rem;
+        min-height: 32px;
+      }
+
+      input[type="text"],
+      input[type="password"],
+      select {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid var(--border-ink);
+        border-radius: 4px;
+        background: #fffdf9;
+        color: var(--ink-primary);
+        font-family: var(--font-sans);
+        font-size: 0.95rem;
+      }
+
+      input:focus,
+      select:focus {
+        outline: none;
+        border-color: var(--bronze);
+        box-shadow: 0 0 0 2px rgba(156, 122, 60, 0.18);
+      }
+
+      /* =========================================
+       4. 步驟一：誠心立問區
+       ========================================= */
+      .question-box {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .question-box input {
+        flex: 1;
+        min-width: 240px;
+      }
+
+      .question-locked-banner {
+        display: none;
+        background: var(--bg-inset);
+        border-left: 4px solid var(--cinnabar);
+        padding: 12px 16px;
+        border-radius: 4px;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .question-locked-banner.active {
+        display: flex;
+      }
+
+      .locked-text {
+        font-size: 1.05rem;
+        font-weight: bold;
+      }
+
+      /* =========================================
+       5. 步驟二：擲銅板與六爻繪製區
+       ========================================= */
+      .divination-grid {
+        display: grid;
+        grid-template-columns: 1.1fr 0.9fr;
+        gap: 24px;
+      }
+
+      @media (max-width: 768px) {
+        .divination-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .mode-tabs {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 16px;
+        background: var(--bg-inset);
+        padding: 4px;
+        border-radius: 6px;
+      }
+
+      .mode-tab {
+        flex: 1;
+        border: none;
+        background: transparent;
+        color: var(--ink-secondary);
+        font-weight: 600;
+        padding: 8px;
+        border-radius: 4px;
+      }
+
+      .mode-tab.active {
+        background: var(--bg-card);
+        color: var(--ink-primary);
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+      }
+
+      .throw-status {
+        text-align: center;
+        margin-bottom: 14px;
+        padding: 10px;
+        background: var(--bg-inset);
+        border-radius: 4px;
+        font-size: 0.95rem;
+      }
+
+      .throw-status strong {
+        color: var(--cinnabar);
+        font-size: 1.1rem;
+      }
+
+      .coins-stage {
+        display: flex;
+        justify-content: center;
+        gap: 20px;
+        margin: 22px 0;
+        min-height: 86px;
+        align-items: center;
+      }
+
+      .coin {
+        width: 76px;
+        height: 76px;
+        border-radius: 50%;
+        background: radial-gradient(circle at 30% 30%, #d8b878, #9c7a3c);
+        border: 3px solid #755823;
+        box-shadow:
+          0 4px 10px rgba(0, 0, 0, 0.18),
+          inset 0 0 6px rgba(255, 255, 255, 0.4);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        font-weight: bold;
+        color: #2b210e;
+        user-select: none;
+      }
+
+      .coin::after {
+        content: "";
+        width: 20px;
+        height: 20px;
+        border: 2px solid #6e521f;
+        background: var(--bg-card);
+        position: absolute;
+      }
+
+      .coin-label-top {
+        position: absolute;
+        top: 5px;
+        font-size: 0.78rem;
+        letter-spacing: 1px;
+      }
+
+      .coin-label-bottom {
+        position: absolute;
+        bottom: 5px;
+        font-size: 0.72rem;
+        font-family: var(--font-sans);
+      }
+
+      .coin.yang {
+        background: radial-gradient(circle at 30% 30%, #e7c989, #b28c45);
+      }
+
+      .coin.yin {
+        background: radial-gradient(circle at 30% 30%, #b7a37e, #7c6844);
+        color: #f7f1e3;
+      }
+
+      .coin.flipping {
+        animation: coinFlip 0.55s ease-in-out;
+      }
+
+      @keyframes coinFlip {
+        0% {
+          transform: rotateY(0deg) translateY(0);
+        }
+        50% {
+          transform: rotateY(540deg) translateY(-18px);
+        }
+        100% {
+          transform: rotateY(1080deg) translateY(0);
+        }
+      }
+
+      .manual-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        margin: 14px 0;
+      }
+
+      .manual-btn {
+        background: #fffdf9;
+        border: 1px solid var(--border-ink);
+        text-align: left;
+        padding: 10px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+
+      .manual-btn:hover:not(:disabled) {
+        border-color: var(--cinnabar);
+        background: #fdf6f5;
+      }
+
+      .manual-btn .m-title {
+        font-weight: bold;
+        color: var(--ink-primary);
+      }
+
+      .manual-btn .m-desc {
+        font-size: 0.78rem;
+        color: var(--ink-secondary);
+      }
+
+      .hexagram-board {
+        background: #fffdf9;
+        border: 1px solid var(--border-ink);
+        border-radius: 6px;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+      }
+
+      .yao-stack {
+        display: flex;
+        flex-direction: column-reverse;
+        gap: 12px;
+        margin: 12px 0;
+      }
+
+      .yao-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        height: 30px;
+        padding: 0 8px;
+        border-radius: 4px;
+        background: rgba(239, 232, 216, 0.45);
+      }
+
+      .yao-row.current-target {
+        outline: 1px dashed var(--cinnabar);
+        background: rgba(166, 44, 43, 0.05);
+      }
+
+      .yao-pos {
+        width: 44px;
+        font-size: 0.85rem;
+        color: var(--ink-secondary);
+        font-weight: bold;
+        flex-shrink: 0;
+      }
+
+      .yao-graphic {
+        flex: 1;
+        height: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .bar-yang {
+        width: 100%;
+        height: 12px;
+        background: var(--ink-primary);
+        border-radius: 2px;
+      }
+
+      .bar-yin {
+        width: 44%;
+        height: 12px;
+        background: var(--ink-primary);
+        border-radius: 2px;
+      }
+
+      .yao-row.moving .bar-yang,
+      .yao-row.moving .bar-yin {
+        background: var(--cinnabar);
+      }
+
+      .yao-placeholder {
+        width: 100%;
+        text-align: center;
+        font-size: 0.8rem;
+        color: var(--ink-muted);
+        letter-spacing: 2px;
+      }
+
+      .yao-meta {
+        width: 84px;
+        text-align: right;
+        font-size: 0.8rem;
+        font-family: var(--font-sans);
+        color: var(--ink-secondary);
+        flex-shrink: 0;
+      }
+
+      .yao-row.moving .yao-meta {
+        color: var(--cinnabar);
+        font-weight: bold;
+      }
+
+      /* =========================================
+       6. 卦象結果與 AI 解卦區
+       ========================================= */
+      .result-panel {
+        display: none;
+      }
+
+      .result-panel.active {
+        display: block;
+      }
+
+      .gua-summary-cards {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+        margin-bottom: 16px;
+      }
+
+      @media (max-width: 600px) {
+        .gua-summary-cards {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .gua-box {
+        background: var(--bg-inset);
+        border: 1px solid var(--border-ink);
+        border-radius: 6px;
+        padding: 14px 16px;
+      }
+
+      .gua-box-label {
+        font-size: 0.8rem;
+        color: var(--ink-secondary);
+        font-family: var(--font-sans);
+      }
+
+      .gua-box-name {
+        font-size: 1.45rem;
+        font-weight: bold;
+        color: var(--ink-primary);
+        margin: 4px 0;
+      }
+
+      .gua-box-trigrams {
+        font-size: 0.88rem;
+        color: var(--ink-secondary);
+      }
+
+      .moving-summary {
+        background: #fffdf9;
+        border: 1px solid var(--border-ink);
+        padding: 12px 16px;
+        border-radius: 6px;
+        margin-bottom: 16px;
+        font-size: 0.92rem;
+      }
+
+      .ai-output-box {
+        background: #fffdf9;
+        border: 1px solid var(--border-ink);
+        border-radius: 6px;
+        padding: 20px;
+        margin-top: 16px;
+        white-space: pre-wrap;
+        line-height: 1.8;
+        font-size: 0.98rem;
+        display: none;
+      }
+
+      .ai-output-box.active {
+        display: block;
+      }
+
+      .external-links {
+        margin-top: 14px;
+        font-size: 0.85rem;
+        color: var(--ink-secondary);
+        font-family: var(--font-sans);
+      }
+
+      .external-links a {
+        color: var(--cinnabar);
+        text-decoration: underline;
+      }
+
+      /* =========================================
+       7. 歷史占卜紀錄區
+       ========================================= */
+      .history-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .history-item {
+        background: #fffdf9;
+        border: 1px solid var(--border-ink);
+        border-radius: 6px;
+        padding: 14px 16px;
+      }
+
+      .history-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .history-q {
+        font-weight: bold;
+        font-size: 1.02rem;
+        color: var(--ink-primary);
+      }
+
+      .history-meta {
+        font-size: 0.82rem;
+        color: var(--ink-secondary);
+        font-family: var(--font-sans);
+        margin-top: 4px;
+      }
+
+      .history-detail {
+        display: none;
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px dashed var(--border-ink);
+        white-space: pre-wrap;
+        font-size: 0.92rem;
+        line-height: 1.75;
+      }
+
+      .history-detail.open {
+        display: block;
+      }
+
+      /* =========================================
+       8. API 設定彈窗 (Modal)
+       ========================================= */
+      .modal-backdrop {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(25, 22, 18, 0.58);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+      }
+
+      .modal-backdrop.open {
+        display: flex;
+      }
+
+      .modal-dialog {
+        background: var(--bg-card);
+        border: 1px solid var(--border-ink);
+        border-top: 4px solid var(--cinnabar);
+        border-radius: 6px;
+        max-width: 480px;
+        width: 100%;
+        padding: 24px;
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
+      }
+
+      .form-group {
+        margin-bottom: 14px;
+      }
+
+      .form-group label {
+        display: block;
+        font-weight: bold;
+        font-size: 0.9rem;
+        margin-bottom: 6px;
+        font-family: var(--font-sans);
+      }
+
+      .form-hint {
+        font-size: 0.8rem;
+        color: var(--ink-secondary);
+        margin-top: 4px;
+        font-family: var(--font-sans);
+      }
+
+      .status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.82rem;
+        padding: 4px 10px;
+        border-radius: 20px;
+        background: var(--bg-inset);
+        font-family: var(--font-sans);
+      }
+
+      .dot-ok {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #2e7d32;
+      }
+
+      .dot-warn {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--cinnabar);
+      }
+
+      .toast {
+        position: fixed;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: var(--ink-primary);
+        color: #fff;
+        padding: 10px 20px;
+        border-radius: 4px;
+        font-family: var(--font-sans);
+        font-size: 0.9rem;
+        z-index: 2000;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.25s ease;
+      }
+
+      .toast.show {
+        opacity: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <!-- 頂部標題與設定列 -->
+      <header>
+        <div class="title-group">
+          <div class="seal-badge">易占</div>
+          <div>
+            <h1>三枚銅板起卦・AI 智慧解卦</h1>
+            <div class="subtitle">心誠則靈・由初爻至上爻六擲成卦</div>
+          </div>
+        </div>
+        <div class="header-actions">
+          <span id="apiStatusPill" class="status-pill">
+            <span class="dot-warn"></span>尚未設定 API Key
+          </span>
+          <button
+            type="button"
+            class="btn-outline btn-sm"
+            id="soundToggleBtn"
+            title="切換銅錢音效"
+          >
+            🔊 音效：開
+          </button>
+          <button type="button" class="btn-ink btn-sm" id="openApiModalBtn">
+            ⚙️ API 設定
+          </button>
+        </div>
+      </header>
+
+      <!-- 步驟一：誠心立問 -->
+      <section class="card">
+        <div class="section-title">
+          <span><span class="step-tag">壹</span>誠心立問</span>
+          <span
+            style="
+              font-size: 0.82rem;
+              color: var(--ink-secondary);
+              font-weight: normal;
+            "
+            >一事一占，意念專注</span
+          >
+        </div>
+        <p
+          style="
+            font-size: 0.9rem;
+            color: var(--ink-secondary);
+            margin-bottom: 12px;
+          "
+        >
+          請靜心默念您想請教的問題（例如：「近期轉換跑道至新公司是否合適？」），確定後點擊「定心開始起卦」。
+        </p>
+
+        <div id="questionInputGroup" class="question-box">
+          <input
+            type="text"
+            id="questionInput"
+            maxlength="120"
+            placeholder="請輸入您心中想占問的具體問題..."
+          />
+          <button type="button" class="btn-primary" id="lockQuestionBtn">
+            定心開始起卦
+          </button>
+        </div>
+
+        <div id="questionLockedBanner" class="question-locked-banner">
+          <div>
+            <div
+              style="
+                font-size: 0.78rem;
+                color: var(--ink-secondary);
+                font-family: var(--font-sans);
+              "
+            >
+              本次所占之事：
+            </div>
+            <div id="lockedQuestionText" class="locked-text"></div>
+          </div>
+          <button type="button" class="btn-outline btn-sm" id="resetAllBtn">
+            重新立問 / 清空重擲
+          </button>
+        </div>
+      </section>
+
+      <!-- 步驟二：六次擲爻與卦象繪製 -->
+      <section class="card">
+        <div class="section-title">
+          <span><span class="step-tag">貳</span>六次擲幣畫爻（由下往上）</span>
+          <span
+            id="progressBadge"
+            style="font-size: 0.85rem; color: var(--cinnabar)"
+            >進度：0 / 6 爻</span
+          >
+        </div>
+
+        <div class="divination-grid">
+          <!-- 左側：擲幣互動區 -->
+          <div>
+            <div class="mode-tabs">
+              <button type="button" class="mode-tab active" data-mode="sim">
+                🪙 模擬擲三枚銅板
+              </button>
+              <button type="button" class="mode-tab" data-mode="manual">
+                ✍️ 手動記錄實體銅板
+              </button>
+            </div>
+
+            <div class="throw-status" id="throwPromptText">
+              請先在上方輸入問題並點擊「定心開始起卦」
+            </div>
+
+            <!-- 模式 A：模擬擲幣 -->
+            <div id="simModePanel">
+              <div class="coins-stage">
+                <div class="coin yang" id="coin0">
+                  <span class="coin-label-top">乾隆</span>
+                  <span class="coin-label-bottom">陽面</span>
+                </div>
+                <div class="coin yang" id="coin1">
+                  <span class="coin-label-top">乾隆</span>
+                  <span class="coin-label-bottom">陽面</span>
+                </div>
+                <div class="coin yang" id="coin2">
+                  <span class="coin-label-top">乾隆</span>
+                  <span class="coin-label-bottom">陽面</span>
+                </div>
+              </div>
+
+              <div style="text-align: center">
+                <button
+                  type="button"
+                  class="btn-primary"
+                  id="throwCoinsBtn"
+                  style="width: 100%; max-width: 280px; font-size: 1rem"
+                  disabled
+                >
+                  擲出第 1 次（初爻）
+                </button>
+              </div>
+              <p
+                style="
+                  font-size: 0.8rem;
+                  color: var(--ink-secondary);
+                  text-align: center;
+                  margin-top: 10px;
+                  font-family: var(--font-sans);
+                "
+              >
+                規則：三陽為老陽(動)、三陰為老陰(動)、二陽一陰為少陽、二陰一陽為少陰
+              </p>
+            </div>
+
+            <!-- 模式 B：手動輸入實體銅板結果 -->
+            <div id="manualModePanel" style="display: none">
+              <p
+                style="
+                  font-size: 0.85rem;
+                  color: var(--ink-secondary);
+                  margin-bottom: 8px;
+                "
+              >
+                若您手邊有實體銅板，請自行擲出後點選對應結果記錄：
+              </p>
+              <div class="manual-grid">
+                <button type="button" class="manual-btn" data-val="9" disabled>
+                  <span class="m-title">三陽（3 個陽面）</span>
+                  <span class="m-desc">老陽 ━━━ ○（陽動變陰）</span>
+                </button>
+                <button type="button" class="manual-btn" data-val="6" disabled>
+                  <span class="m-title">三陰（3 個陰面）</span>
+                  <span class="m-desc">老陰 ━ ━ ✕（陰動變陽）</span>
+                </button>
+                <button type="button" class="manual-btn" data-val="7" disabled>
+                  <span class="m-title">二陽一陰</span>
+                  <span class="m-desc">少陽 ━━━（陽爻不變）</span>
+                </button>
+                <button type="button" class="manual-btn" data-val="8" disabled>
+                  <span class="m-title">二陰一陽</span>
+                  <span class="m-desc">少陰 ━ ━（陰爻不變）</span>
+                </button>
+              </div>
+            </div>
+
+            <div
+              style="margin-top: 14px; display: flex; justify-content: flex-end"
+            >
+              <button
+                type="button"
+                class="btn-outline btn-sm"
+                id="undoYaoBtn"
+                disabled
+              >
+                ↩ 撤銷上一爻
+              </button>
+            </div>
+          </div>
+
+          <!-- 右側：六爻即時卦象圖 -->
+          <div class="hexagram-board">
+            <div
+              style="
+                display: flex;
+                justify-content: space-between;
+                font-size: 0.82rem;
+                color: var(--ink-secondary);
+                font-family: var(--font-sans);
+              "
+            >
+              <span>上卦（外卦）：四～上爻</span>
+              <span>下卦（內卦）：初～三爻</span>
+            </div>
+
+            <div class="yao-stack" id="yaoStack"></div>
+
+            <div
+              style="
+                font-size: 0.78rem;
+                color: var(--ink-muted);
+                text-align: center;
+                font-family: var(--font-sans);
+              "
+            >
+              註：硃砂紅標示為「動爻（老陽 ○ / 老陰 ✕）」，將轉化為變卦
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 步驟三：卦象結果與 AI 解卦 -->
+      <section class="card result-panel" id="resultPanel">
+        <div class="section-title">
+          <span><span class="step-tag">參</span>成卦結果與 AI 智慧解卦</span>
+        </div>
+
+        <div class="gua-summary-cards">
+          <div class="gua-box">
+            <div class="gua-box-label">【本卦】現況與根基</div>
+            <div class="gua-box-name" id="benGuaName">—</div>
+            <div class="gua-box-trigrams" id="benGuaSub">—</div>
+          </div>
+          <div class="gua-box">
+            <div class="gua-box-label">【之卦／變卦】發展趨勢與結果</div>
+            <div class="gua-box-name" id="bianGuaName">—</div>
+            <div class="gua-box-trigrams" id="bianGuaSub">—</div>
+          </div>
+        </div>
+
+        <div class="moving-summary" id="movingRuleBox"></div>
+
+        <div
+          style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center"
+        >
+          <button type="button" class="btn-primary" id="askAiBtn">
+            ✨ 啟動 AI 深度解卦
+          </button>
+          <button type="button" class="btn-outline" id="copyResultBtn">
+            📋 複製卦象文字（可貼至易學網查詢）
+          </button>
+        </div>
+
+        <div class="external-links">
+          參考工具：可前往
+          <a
+            href="https://www.eee-learning.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            >易學網</a
+          >
+          對照《易經》原文卦辭與爻辭。
+        </div>
+
+        <div class="ai-output-box" id="aiOutputBox"></div>
+      </section>
+
+      <!-- 步驟四：本機歷史占卜紀錄 -->
+      <section class="card">
+        <div class="section-title">
+          <span
+            ><span class="step-tag">肆</span
+            >歷史占卜紀錄（存於本機瀏覽器）</span
+          >
+          <button type="button" class="btn-outline btn-sm" id="clearHistoryBtn">
+            清空全部紀錄
+          </button>
+        </div>
+        <div id="historyList" class="history-list">
+          <div
+            style="
+              color: var(--ink-muted);
+              font-size: 0.9rem;
+              text-align: center;
+              padding: 16px;
+            "
+          >
+            尚無占卜紀錄，完成一次六爻起卦後將自動保存於此。
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- API Key 設定彈窗 -->
+    <div class="modal-backdrop" id="apiModal">
+      <div class="modal-dialog">
+        <div class="section-title" style="margin-bottom: 16px">
+          <span>⚙️ AI 解卦 API 金鑰設定</span>
+          <button
+            type="button"
+            class="btn-outline btn-sm"
+            id="closeApiModalBtn"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div class="form-group">
+          <label for="providerSelect">選擇 AI 服務商</label>
+          <select id="providerSelect">
+            <option value="gemini">
+              Google Gemini（預設 gemini-3-flash-preview）
+            </option>
+            <option value="openai">OpenAI（預設 gpt-4o-mini）</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="modelInput">模型名稱（可依需求微調）</label>
+          <input
+            type="text"
+            id="modelInput"
+            placeholder="例如：gemini-3-flash-preview 或 gpt-4o-mini"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="apiKeyInput">輸入您的 API Key</label>
+          <input
+            type="password"
+            id="apiKeyInput"
+            placeholder="貼上您的 API Key..."
+          />
+          <div class="form-hint">
+            🔒 隱私聲明：您的 API Key 僅儲存在目前瀏覽器的
+            <code>localStorage</code> 中，不會上傳至任何第三方伺服器。
+          </div>
+        </div>
+
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            margin-top: 20px;
+          "
+        >
+          <button
+            type="button"
+            class="btn-outline"
+            id="clearApiKeyBtn"
+            style="color: var(--cinnabar); border-color: var(--cinnabar)"
+          >
+            清除金鑰
+          </button>
+          <div style="display: flex; gap: 8px">
+            <button type="button" class="btn-outline" id="cancelApiModalBtn">
+              取消
+            </button>
+            <button type="button" class="btn-primary" id="saveApiKeyBtn">
+              儲存設定
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 輕量提示訊息 -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+      /* =========================================
+       1. 易經八卦與完整 64 卦資料庫
+       爻位順序：由下往上 [初爻, 二爻, 三爻, 四爻, 五爻, 上爻]
+       1 = 陽爻, 0 = 陰爻
+       ========================================= */
+      const TRIGRAMS = {
+        111: { name: "乾", nature: "天", symbol: "☰" },
+        "011": { name: "兌", nature: "澤", symbol: "☱" },
+        101: { name: "離", nature: "火", symbol: "☲" },
+        "001": { name: "震", nature: "雷", symbol: "☳" },
+        110: { name: "巽", nature: "風", symbol: "☴" },
+        "010": { name: "坎", nature: "水", symbol: "☵" },
+        100: { name: "艮", nature: "山", symbol: "☶" },
+        "000": { name: "坤", nature: "地", symbol: "☷" },
+      };
+
+      const HEXAGRAMS = {
+        111111: { num: 1, name: "乾為天", full: "第1卦 乾為天（乾上乾下）" },
+        "000000": { num: 2, name: "坤為地", full: "第2卦 坤為地（坤上坤下）" },
+        100010: { num: 3, name: "水雷屯", full: "第3卦 水雷屯（坎上震下）" },
+        "010001": { num: 4, name: "山水蒙", full: "第4卦 山水蒙（艮上坎下）" },
+        111010: { num: 5, name: "水天需", full: "第5卦 水天需（坎上乾下）" },
+        "010111": { num: 6, name: "天水訟", full: "第6卦 天水訟（乾上坎下）" },
+        "010000": { num: 7, name: "地水師", full: "第7卦 地水師（坤上坎下）" },
+        "000010": { num: 8, name: "水地比", full: "第8卦 水地比（坎上坤下）" },
+        111110: {
+          num: 9,
+          name: "風天小畜",
+          full: "第9卦 風天小畜（巽上乾下）",
+        },
+        "011111": {
+          num: 10,
+          name: "天澤履",
+          full: "第10卦 天澤履（乾上兌下）",
+        },
+        111000: { num: 11, name: "地天泰", full: "第11卦 地天泰（坤上乾下）" },
+        "000111": {
+          num: 12,
+          name: "天地否",
+          full: "第12卦 天地否（乾上坤下）",
+        },
+        101111: {
+          num: 13,
+          name: "天火同人",
+          full: "第13卦 天火同人（乾上離下）",
+        },
+        111101: {
+          num: 14,
+          name: "火天大有",
+          full: "第14卦 火天大有（離上乾下）",
+        },
+        "001000": {
+          num: 15,
+          name: "地山謙",
+          full: "第15卦 地山謙（坤上艮下）",
+        },
+        "000100": {
+          num: 16,
+          name: "雷地豫",
+          full: "第16卦 雷地豫（震上坤下）",
+        },
+        100011: { num: 17, name: "澤雷隨", full: "第17卦 澤雷隨（兌上震下）" },
+        110001: { num: 18, name: "山風蠱", full: "第18卦 山風蠱（艮上巽下）" },
+        "011000": {
+          num: 19,
+          name: "地澤臨",
+          full: "第19卦 地澤臨（坤上兌下）",
+        },
+        "000110": {
+          num: 20,
+          name: "風地觀",
+          full: "第20卦 風地觀（巽上坤下）",
+        },
+        100101: {
+          num: 21,
+          name: "火雷噬嗑",
+          full: "第21卦 火雷噬嗑（離上震下）",
+        },
+        101001: { num: 22, name: "山火賁", full: "第22卦 山火賁（艮上離下）" },
+        "000001": {
+          num: 23,
+          name: "山地剝",
+          full: "第23卦 山地剝（艮上坤下）",
+        },
+        100000: { num: 24, name: "地雷復", full: "第24卦 地雷復（坤上震下）" },
+        100111: {
+          num: 25,
+          name: "天雷無妄",
+          full: "第25卦 天雷無妄（乾上震下）",
+        },
+        111001: {
+          num: 26,
+          name: "山天大畜",
+          full: "第26卦 山天大畜（艮上乾下）",
+        },
+        100001: { num: 27, name: "山雷頤", full: "第27卦 山雷頤（艮上震下）" },
+        "011110": {
+          num: 28,
+          name: "澤風大過",
+          full: "第28卦 澤風大過（兌上巽下）",
+        },
+        "010010": {
+          num: 29,
+          name: "坎為水",
+          full: "第29卦 坎為水（坎上坎下）",
+        },
+        101101: { num: 30, name: "離為火", full: "第30卦 離為火（離上離下）" },
+        "001011": {
+          num: 31,
+          name: "澤山咸",
+          full: "第31卦 澤山咸（兌上艮下）",
+        },
+        110100: { num: 32, name: "雷風恆", full: "第32卦 雷風恆（震上巽下）" },
+        "001111": {
+          num: 33,
+          name: "天山遯",
+          full: "第33卦 天山遯（乾上艮下）",
+        },
+        111100: {
+          num: 34,
+          name: "雷天大壯",
+          full: "第34卦 雷天大壯（震上乾下）",
+        },
+        "000101": {
+          num: 35,
+          name: "火地晉",
+          full: "第35卦 火地晉（離上坤下）",
+        },
+        101000: {
+          num: 36,
+          name: "地火明夷",
+          full: "第36卦 地火明夷（坤上離下）",
+        },
+        101110: {
+          num: 37,
+          name: "風火家人",
+          full: "第37卦 風火家人（巽上離下）",
+        },
+        "011101": {
+          num: 38,
+          name: "火澤睽",
+          full: "第38卦 火澤睽（離上兌下）",
+        },
+        "001010": {
+          num: 39,
+          name: "水山蹇",
+          full: "第39卦 水山蹇（坎上艮下）",
+        },
+        "010100": {
+          num: 40,
+          name: "雷水解",
+          full: "第40卦 雷水解（震上坎下）",
+        },
+        "011001": {
+          num: 41,
+          name: "山澤損",
+          full: "第41卦 山澤損（艮上兌下）",
+        },
+        100110: { num: 42, name: "風雷益", full: "第42卦 風雷益（巽上震下）" },
+        111011: { num: 43, name: "澤天夬", full: "第43卦 澤天夬（兌上乾下）" },
+        110111: { num: 44, name: "天風姤", full: "第44卦 天風姤（乾上巽下）" },
+        "000011": {
+          num: 45,
+          name: "澤地萃",
+          full: "第45卦 澤地萃（兌上坤下）",
+        },
+        110000: { num: 46, name: "地風升", full: "第46卦 地風升（坤上巽下）" },
+        "010011": {
+          num: 47,
+          name: "澤水困",
+          full: "第47卦 澤水困（兌上坎下）",
+        },
+        110010: { num: 48, name: "水風井", full: "第48卦 水風井（坎上巽下）" },
+        101011: { num: 49, name: "澤火革", full: "第49卦 澤火革（兌上離下）" },
+        110101: { num: 50, name: "火風鼎", full: "第50卦 火風鼎（離上巽下）" },
+        100100: { num: 51, name: "震為雷", full: "第51卦 震為雷（震上震下）" },
+        "001001": {
+          num: 52,
+          name: "艮為山",
+          full: "第52卦 艮為山（艮上艮下）",
+        },
+        "001110": {
+          num: 53,
+          name: "風山漸",
+          full: "第53卦 風山漸（巽上艮下）",
+        },
+        "011100": {
+          num: 54,
+          name: "雷澤歸妹",
+          full: "第54卦 雷澤歸妹（震上兌下）",
+        },
+        101100: { num: 55, name: "雷火豐", full: "第55卦 雷火豐（震上離下）" },
+        "001101": {
+          num: 56,
+          name: "火山旅",
+          full: "第56卦 火山旅（離上艮下）",
+        },
+        110110: { num: 57, name: "巽為風", full: "第57卦 巽為風（巽上巽下）" },
+        "011011": {
+          num: 58,
+          name: "兌為澤",
+          full: "第58卦 兌為澤（兌上兌下）",
+        },
+        "010110": {
+          num: 59,
+          name: "風水渙",
+          full: "第59卦 風水渙（巽上坎下）",
+        },
+        "011010": {
+          num: 60,
+          name: "水澤節",
+          full: "第60卦 水澤節（坎上兌下）",
+        },
+        110011: {
+          num: 61,
+          name: "風澤中孚",
+          full: "第61卦 風澤中孚（巽上兌下）",
+        },
+        "001100": {
+          num: 62,
+          name: "雷山小過",
+          full: "第62卦 雷山小過（震上艮下）",
+        },
+        101010: {
+          num: 63,
+          name: "水火既濟",
+          full: "第63卦 水火既濟（坎上離下）",
+        },
+        "010101": {
+          num: 64,
+          name: "火水未濟",
+          full: "第64卦 火水未濟（離上坎下）",
+        },
+      };
+
+      const YAO_POS_NAMES = ["初爻", "二爻", "三爻", "四爻", "五爻", "上爻"];
+
+      /* =========================================
+       2. 應用程式狀態與本機儲存鍵值
+       ========================================= */
+      const STORAGE_KEYS = {
+        API_CFG: "iching_api_config_v1",
+        HISTORY: "iching_history_v1",
+      };
+
+      let state = {
+        question: "",
+        isLocked: false,
+        yaos: [], // 儲存 6 個物件：{ val: 6|7|8|9, coins: [1,1,0], label, isYang, isMoving }
+        isAnimating: false,
+        soundEnabled: true,
+        currentRecordId: null,
+      };
+
+      /* =========================================
+       3. DOM 參照與初始化
+       ========================================= */
+      const els = {
+        questionInput: document.getElementById("questionInput"),
+        lockQuestionBtn: document.getElementById("lockQuestionBtn"),
+        questionInputGroup: document.getElementById("questionInputGroup"),
+        questionLockedBanner: document.getElementById("questionLockedBanner"),
+        lockedQuestionText: document.getElementById("lockedQuestionText"),
+        resetAllBtn: document.getElementById("resetAllBtn"),
+        progressBadge: document.getElementById("progressBadge"),
+        throwPromptText: document.getElementById("throwPromptText"),
+        throwCoinsBtn: document.getElementById("throwCoinsBtn"),
+        undoYaoBtn: document.getElementById("undoYaoBtn"),
+        yaoStack: document.getElementById("yaoStack"),
+        resultPanel: document.getElementById("resultPanel"),
+        benGuaName: document.getElementById("benGuaName"),
+        benGuaSub: document.getElementById("benGuaSub"),
+        bianGuaName: document.getElementById("bianGuaName"),
+        bianGuaSub: document.getElementById("bianGuaSub"),
+        movingRuleBox: document.getElementById("movingRuleBox"),
+        askAiBtn: document.getElementById("askAiBtn"),
+        copyResultBtn: document.getElementById("copyResultBtn"),
+        aiOutputBox: document.getElementById("aiOutputBox"),
+        historyList: document.getElementById("historyList"),
+        clearHistoryBtn: document.getElementById("clearHistoryBtn"),
+        soundToggleBtn: document.getElementById("soundToggleBtn"),
+        apiStatusPill: document.getElementById("apiStatusPill"),
+        openApiModalBtn: document.getElementById("openApiModalBtn"),
+        apiModal: document.getElementById("apiModal"),
+        closeApiModalBtn: document.getElementById("closeApiModalBtn"),
+        cancelApiModalBtn: document.getElementById("cancelApiModalBtn"),
+        providerSelect: document.getElementById("providerSelect"),
+        modelInput: document.getElementById("modelInput"),
+        apiKeyInput: document.getElementById("apiKeyInput"),
+        saveApiKeyBtn: document.getElementById("saveApiKeyBtn"),
+        clearApiKeyBtn: document.getElementById("clearApiKeyBtn"),
+        toast: document.getElementById("toast"),
+      };
+
+      function showToast(msg) {
+        els.toast.textContent = msg;
+        els.toast.classList.add("show");
+        setTimeout(() => els.toast.classList.remove("show"), 2600);
+      }
+
+      /* =========================================
+       4. Web Audio API 合成清脆銅錢碰撞聲
+       ========================================= */
+      function playCoinSound() {
+        if (!state.soundEnabled) return;
+        try {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          const ctx = new AudioCtx();
+          const now = ctx.currentTime;
+          [0, 0.11, 0.22].forEach((offset, idx) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = "triangle";
+            osc.frequency.setValueAtTime(2200 + idx * 320, now + offset);
+            osc.frequency.exponentialRampToValueAtTime(
+              980,
+              now + offset + 0.16,
+            );
+            gain.gain.setValueAtTime(0.14, now + offset);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + offset + 0.18);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now + offset);
+            osc.stop(now + offset + 0.19);
+          });
+        } catch (e) {
+          // 忽略不支援音效的瀏覽器環境
+        }
+      }
+
+      /* =========================================
+       5. API Key 本機設定管理 (Gemini & OpenAI)
+       ========================================= */
+      function getApiConfig() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEYS.API_CFG);
+          if (!raw)
+            return {
+              provider: "gemini",
+              model: "gemini-3-flash-preview",
+              apiKey: "",
+            };
+          return JSON.parse(raw);
+        } catch {
+          return {
+            provider: "gemini",
+            model: "gemini-3-flash-preview",
+            apiKey: "",
+          };
+        }
+      }
+
+      function updateApiStatusUI() {
+        const cfg = getApiConfig();
+        if (cfg.apiKey && cfg.apiKey.trim()) {
+          const label = cfg.provider === "gemini" ? "Gemini" : "OpenAI";
+          els.apiStatusPill.innerHTML = `<span class="dot-ok"></span>已設定 ${label} 金鑰`;
+        } else {
+          els.apiStatusPill.innerHTML = `<span class="dot-warn"></span>尚未設定 API Key`;
+        }
+      }
+
+      function openApiModal() {
+        const cfg = getApiConfig();
+        els.providerSelect.value = cfg.provider || "gemini";
+        els.modelInput.value =
+          cfg.model ||
+          (cfg.provider === "openai"
+            ? "gpt-4o-mini"
+            : "gemini-3-flash-preview");
+        els.apiKeyInput.value = cfg.apiKey || "";
+        els.apiModal.classList.add("open");
+      }
+
+      function closeApiModal() {
+        els.apiModal.classList.remove("open");
+      }
+
+      els.providerSelect.addEventListener("change", () => {
+        els.modelInput.value =
+          els.providerSelect.value === "openai"
+            ? "gpt-4o-mini"
+            : "gemini-3-flash-preview";
+      });
+
+      els.openApiModalBtn.addEventListener("click", openApiModal);
+      els.closeApiModalBtn.addEventListener("click", closeApiModal);
+      els.cancelApiModalBtn.addEventListener("click", closeApiModal);
+
+      els.saveApiKeyBtn.addEventListener("click", () => {
+        const provider = els.providerSelect.value;
+        const model =
+          els.modelInput.value.trim() ||
+          (provider === "openai" ? "gpt-4o-mini" : "gemini-3-flash-preview");
+        const apiKey = els.apiKeyInput.value.trim();
+        if (!apiKey) {
+          showToast("請輸入有效的 API Key");
+          return;
+        }
+        localStorage.setItem(
+          STORAGE_KEYS.API_CFG,
+          JSON.stringify({ provider, model, apiKey }),
+        );
+        updateApiStatusUI();
+        closeApiModal();
+        showToast("API 設定已安全儲存於本機瀏覽器");
+      });
+
+      els.clearApiKeyBtn.addEventListener("click", () => {
+        localStorage.removeItem(STORAGE_KEYS.API_CFG);
+        els.apiKeyInput.value = "";
+        updateApiStatusUI();
+        closeApiModal();
+        showToast("已清除本機儲存的 API Key");
+      });
+
+      /* =========================================
+       6. 誠心立問與模式切換
+       ========================================= */
+      els.lockQuestionBtn.addEventListener("click", () => {
+        const q = els.questionInput.value.trim();
+        if (!q) {
+          showToast("請先輸入您心中想占問的問題");
+          els.questionInput.focus();
+          return;
+        }
+        state.question = q;
+        state.isLocked = true;
+        state.yaos = [];
+        state.currentRecordId = null;
+
+        els.questionInputGroup.style.display = "none";
+        els.lockedQuestionText.textContent = q;
+        els.questionLockedBanner.classList.add("active");
+        els.resultPanel.classList.remove("active");
+        els.aiOutputBox.classList.remove("active");
+        els.aiOutputBox.textContent = "";
+
+        renderYaoBoard();
+        updateThrowControls();
+        showToast("問題已定，請開始第 1 次擲幣（初爻）");
+      });
+
+      els.resetAllBtn.addEventListener("click", () => {
+        state.question = "";
+        state.isLocked = false;
+        state.yaos = [];
+        state.currentRecordId = null;
+
+        els.questionInput.value = "";
+        els.questionInputGroup.style.display = "flex";
+        els.questionLockedBanner.classList.remove("active");
+        els.resultPanel.classList.remove("active");
+        els.aiOutputBox.classList.remove("active");
+        els.aiOutputBox.textContent = "";
+
+        renderYaoBoard();
+        updateThrowControls();
+      });
+
+      // 切換「模擬擲幣」與「手動記錄」
+      document.querySelectorAll(".mode-tab").forEach((tab) => {
+        tab.addEventListener("click", () => {
+          document
+            .querySelectorAll(".mode-tab")
+            .forEach((t) => t.classList.remove("active"));
+          tab.classList.add("active");
+          const mode = tab.dataset.mode;
+          document.getElementById("simModePanel").style.display =
+            mode === "sim" ? "block" : "none";
+          document.getElementById("manualModePanel").style.display =
+            mode === "manual" ? "block" : "none";
+        });
+      });
+
+      els.soundToggleBtn.addEventListener("click", () => {
+        state.soundEnabled = !state.soundEnabled;
+        els.soundToggleBtn.textContent = state.soundEnabled
+          ? "🔊 音效：開"
+          : "🔇 音效：關";
+      });
+
+      /* =========================================
+       7. 三枚銅板判定與六爻繪製邏輯
+       ========================================= */
+      function createYaoFromValue(val, coinsArr = null) {
+        // val: 9=三陽(老陽), 6=三陰(老陰), 7=二陽一陰(少陽), 8=二陰一陽(少陰)
+        if (val === 9) {
+          return {
+            val: 9,
+            coins: coinsArr || [1, 1, 1],
+            label: "老陽 ○",
+            isYang: true,
+            isMoving: true,
+          };
+        } else if (val === 6) {
+          return {
+            val: 6,
+            coins: coinsArr || [0, 0, 0],
+            label: "老陰 ✕",
+            isYang: false,
+            isMoving: true,
+          };
+        } else if (val === 7) {
+          return {
+            val: 7,
+            coins: coinsArr || [1, 1, 0],
+            label: "少陽",
+            isYang: true,
+            isMoving: false,
+          };
+        } else {
+          return {
+            val: 8,
+            coins: coinsArr || [0, 0, 1],
+            label: "少陰",
+            isYang: false,
+            isMoving: false,
+          };
+        }
+      }
+
+      function updateThrowControls() {
+        const count = state.yaos.length;
+        els.progressBadge.textContent = `進度：${count} / 6 爻`;
+        const manualBtns = document.querySelectorAll(".manual-btn");
+
+        if (!state.isLocked) {
+          els.throwPromptText.innerHTML =
+            "請先在上方輸入問題並點擊「定心開始起卦」";
+          els.throwCoinsBtn.disabled = true;
+          els.throwCoinsBtn.textContent = "擲出第 1 次（初爻）";
+          manualBtns.forEach((b) => (b.disabled = true));
+          els.undoYaoBtn.disabled = true;
+          return;
+        }
+
+        els.undoYaoBtn.disabled = count === 0 || state.isAnimating;
+
+        if (count < 6) {
+          const nextIdx = count + 1;
+          const posName = YAO_POS_NAMES[count];
+          els.throwPromptText.innerHTML = `準備進行第 <strong>${nextIdx}</strong> 次擲幣（畫出由下往上第 ${nextIdx} 爻：<strong>${posName}</strong>）`;
+          els.throwCoinsBtn.disabled = state.isAnimating;
+          els.throwCoinsBtn.textContent = `🪙 擲出第 ${nextIdx} 次（${posName}）`;
+          manualBtns.forEach((b) => (b.disabled = state.isAnimating));
+        } else {
+          els.throwPromptText.innerHTML = `🎉 <strong>六爻已成！</strong>請往下檢視本卦、變卦與 AI 解卦指引`;
+          els.throwCoinsBtn.disabled = true;
+          els.throwCoinsBtn.textContent = "六爻已擲畢";
+          manualBtns.forEach((b) => (b.disabled = true));
+        }
+      }
+
+      function renderYaoBoard() {
+        els.yaoStack.innerHTML = "";
+        for (let i = 0; i < 6; i++) {
+          const row = document.createElement("div");
+          const yao = state.yaos[i];
+          row.className = "yao-row";
+          if (yao && yao.isMoving) row.classList.add("moving");
+          if (state.isLocked && i === state.yaos.length)
+            row.classList.add("current-target");
+
+          const posDiv = document.createElement("div");
+          posDiv.className = "yao-pos";
+          posDiv.textContent = YAO_POS_NAMES[i];
+
+          const graphicDiv = document.createElement("div");
+          graphicDiv.className = "yao-graphic";
+
+          const metaDiv = document.createElement("div");
+          metaDiv.className = "yao-meta";
+
+          if (yao) {
+            if (yao.isYang) {
+              graphicDiv.innerHTML = `<div class="bar-yang"></div>`;
+            } else {
+              graphicDiv.innerHTML = `<div class="bar-yin"></div><div class="bar-yin"></div>`;
+            }
+            metaDiv.textContent = yao.label;
+          } else {
+            graphicDiv.innerHTML = `<div class="yao-placeholder">・ ・ ・ 待擲 ・ ・ ・</div>`;
+            metaDiv.textContent = "—";
+          }
+
+          row.appendChild(posDiv);
+          row.appendChild(graphicDiv);
+          row.appendChild(metaDiv);
+          els.yaoStack.appendChild(row);
+        }
+      }
+
+      // 模擬擲三枚銅板
+      els.throwCoinsBtn.addEventListener("click", () => {
+        if (!state.isLocked || state.yaos.length >= 6 || state.isAnimating)
+          return;
+
+        state.isAnimating = true;
+        updateThrowControls();
+        playCoinSound();
+
+        // 產生三枚銅板結果 (1=陽面, 0=陰面)
+        const coins = [
+          Math.random() < 0.5 ? 1 : 0,
+          Math.random() < 0.5 ? 1 : 0,
+          Math.random() < 0.5 ? 1 : 0,
+        ];
+
+        coins.forEach((c, idx) => {
+          const coinEl = document.getElementById(`coin${idx}`);
+          coinEl.classList.remove("flipping");
+          void coinEl.offsetWidth;
+          coinEl.classList.add("flipping");
+        });
+
+        setTimeout(() => {
+          coins.forEach((c, idx) => {
+            const coinEl = document.getElementById(`coin${idx}`);
+            coinEl.classList.remove("yang", "yin");
+            coinEl.classList.add(c === 1 ? "yang" : "yin");
+            coinEl.querySelector(".coin-label-top").textContent =
+              c === 1 ? "乾隆" : "滿文";
+            coinEl.querySelector(".coin-label-bottom").textContent =
+              c === 1 ? "陽面" : "陰面";
+          });
+
+          const yangCount = coins.reduce((sum, v) => sum + v, 0);
+          let val = 8;
+          if (yangCount === 3)
+            val = 9; // 三陽 -> 老陽
+          else if (yangCount === 0)
+            val = 6; // 三陰 -> 老陰
+          else if (yangCount === 2)
+            val = 7; // 二陽一陰 -> 少陽
+          else val = 8; // 二陰一陽 -> 少陰
+
+          recordOneYao(val, coins);
+          state.isAnimating = false;
+          updateThrowControls();
+        }, 560);
+      });
+
+      // 手動點選實體銅板結果
+      document.querySelectorAll(".manual-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          if (!state.isLocked || state.yaos.length >= 6 || state.isAnimating)
+            return;
+          const val = parseInt(btn.dataset.val, 10);
+          recordOneYao(val, null);
+          updateThrowControls();
+        });
+      });
+
+      function recordOneYao(val, coins) {
+        const yao = createYaoFromValue(val, coins);
+        state.yaos.push(yao);
+        renderYaoBoard();
+
+        if (state.yaos.length === 6) {
+          finalizeHexagram();
+        }
+      }
+
+      // 撤銷上一爻
+      els.undoYaoBtn.addEventListener("click", () => {
+        if (state.yaos.length === 0 || state.isAnimating) return;
+        state.yaos.pop();
+        els.resultPanel.classList.remove("active");
+        renderYaoBoard();
+        updateThrowControls();
+        showToast("已撤銷上一爻");
+      });
+
+      /* =========================================
+       8. 計算本卦、變卦與傳統變爻解卦法則
+       ========================================= */
+      function getMovingGuidance(movingIndices) {
+        const count = movingIndices.length;
+        const posLabels = movingIndices.map((i) => YAO_POS_NAMES[i]).join("、");
+        if (count === 0) {
+          return {
+            count: 0,
+            posText: "無動爻（六爻皆靜）",
+            rule: "【六爻皆不變】以「本卦」卦辭為主要斷事依據，局勢相對穩定，循本卦之道而行即可。",
+          };
+        } else if (count === 1) {
+          return {
+            count: 1,
+            posText: `1 個動爻（${posLabels}）`,
+            rule: `【一爻動】以本卦「${posLabels}」的爻辭為核心指引，並參看變卦作為後續趨勢。`,
+          };
+        } else if (count === 2) {
+          return {
+            count: 2,
+            posText: `2 個動爻（${posLabels}）`,
+            rule: `【二爻動】以本卦這兩個動爻的爻辭為重點，並以上方較高位置（${YAO_POS_NAMES[movingIndices[1]]}）為主。`,
+          };
+        } else if (count === 3) {
+          return {
+            count: 3,
+            posText: `3 個動爻（${posLabels}）`,
+            rule: "【三爻動】局勢正處於轉折交界，需綜合參看「本卦卦辭」與「變卦卦辭」（本卦為貞、變卦為悔）。",
+          };
+        } else if (count === 4) {
+          const staticIndices = [0, 1, 2, 3, 4, 5].filter(
+            (i) => !movingIndices.includes(i),
+          );
+          const lowerStatic = YAO_POS_NAMES[staticIndices[0]];
+          return {
+            count: 4,
+            posText: `4 個動爻（${posLabels}）`,
+            rule: `【四爻動】變化劇烈，改以「變卦」中兩個不變的靜爻為參考，並以下方靜爻（${lowerStatic}）為主。`,
+          };
+        } else if (count === 5) {
+          const staticIdx = [0, 1, 2, 3, 4, 5].find(
+            (i) => !movingIndices.includes(i),
+          );
+          return {
+            count: 5,
+            posText: `5 個動爻（${posLabels}）`,
+            rule: `【五爻動】大局已轉向變卦，專以「變卦」中唯一不變的靜爻（${YAO_POS_NAMES[staticIdx]}）爻辭為主。`,
+          };
+        } else {
+          return {
+            count: 6,
+            posText: "六爻全動（乾坤用九/用六，其餘看變卦）",
+            rule: "【六爻全動】乾卦看「用九」、坤卦看「用六」；其餘六十二卦直接以「變卦」的卦辭為核心指引。",
+          };
+        }
+      }
+
+      function calculateDivinationResult() {
+        const benBits = state.yaos.map((y) => (y.isYang ? "1" : "0")).join("");
+        const bianBits = state.yaos
+          .map((y) => {
+            if (y.isMoving) return y.isYang ? "0" : "1";
+            return y.isYang ? "1" : "0";
+          })
+          .join("");
+
+        const benLower = TRIGRAMS[benBits.slice(0, 3)];
+        const benUpper = TRIGRAMS[benBits.slice(3, 6)];
+        const bianLower = TRIGRAMS[bianBits.slice(0, 3)];
+        const bianUpper = TRIGRAMS[bianBits.slice(3, 6)];
+
+        const benHex = HEXAGRAMS[benBits];
+        const bianHex = HEXAGRAMS[bianBits];
+
+        const movingIndices = [];
+        state.yaos.forEach((y, idx) => {
+          if (y.isMoving) movingIndices.push(idx);
+        });
+
+        const guidance = getMovingGuidance(movingIndices);
+
+        return {
+          benBits,
+          bianBits,
+          benHex,
+          bianHex,
+          benTrigramText: `上${benUpper.name}（${benUpper.nature} ${benUpper.symbol}）下${benLower.name}（${benLower.nature} ${benLower.symbol}）`,
+          bianTrigramText: `上${bianUpper.name}（${bianUpper.nature} ${bianUpper.symbol}）下${bianLower.name}（${bianLower.nature} ${bianLower.symbol}）`,
+          movingIndices,
+          guidance,
+        };
+      }
+
+      function finalizeHexagram() {
+        const res = calculateDivinationResult();
+        els.benGuaName.textContent = res.benHex.full;
+        els.benGuaSub.textContent = res.benTrigramText;
+
+        if (res.movingIndices.length === 0) {
+          els.bianGuaName.textContent = `${res.bianHex.name}（無動爻・同本卦）`;
+          els.bianGuaSub.textContent = res.bianTrigramText;
+        } else {
+          els.bianGuaName.textContent = res.bianHex.full;
+          els.bianGuaSub.textContent = res.bianTrigramText;
+        }
+
+        els.movingRuleBox.innerHTML = `
+        <div style="margin-bottom:4px;"><strong>動爻狀態：</strong>${res.guidance.posText}</div>
+        <div><strong>解卦取象法則：</strong>${res.guidance.rule}</div>
+      `;
+
+        els.resultPanel.classList.add("active");
+        els.resultPanel.scrollIntoView({
+          behavior: "smooth",
+          block: "nearest",
+        });
+
+        const record = {
+          id: Date.now().toString(),
+          timestamp: new Date().toLocaleString("zh-TW", { hour12: false }),
+          question: state.question,
+          yaosSummary: state.yaos
+            .map((y, i) => `${YAO_POS_NAMES[i]}:${y.label}`)
+            .join(" / "),
+          benGua: res.benHex.full,
+          bianGua:
+            res.movingIndices.length === 0
+              ? "無變卦（六爻皆靜）"
+              : res.bianHex.full,
+          movingText: res.guidance.posText,
+          aiInterpretation: "",
+        };
+        state.currentRecordId = record.id;
+        saveHistoryRecord(record);
+      }
+
+      /* =========================================
+       9. 呼叫 Gemini / OpenAI API 進行深度解卦
+       ========================================= */
+      function buildDivinationPrompt(res) {
+        const yaoLines = state.yaos
+          .map(
+            (y, idx) =>
+              `- 第${idx + 1}次（${YAO_POS_NAMES[idx]}）：${y.label}（${y.isYang ? "陽爻" : "陰爻"}${y.isMoving ? "，動爻" : "，靜爻"}）`,
+          )
+          .join("\n");
+
+        return `你是一位精通《周易》義理與象數的資深易學顧問。請針對以下「三枚銅板起卦」結果，為問卜者提供沉穩、客觀、具啟發性且白話易懂的解卦指引。
+
+【所問之事】
+${state.question}
+
+【六爻明細（由初爻至上爻）】
+${yaoLines}
+
+【成卦結果】
+- 本卦：${res.benHex.full}（${res.benTrigramText}）
+- 變卦（之卦）：${res.movingIndices.length === 0 ? "無動爻，同本卦" : `${res.bianHex.full}（${res.bianTrigramText}）`}
+- 動爻情況：${res.guidance.posText}
+- 傳統斷卦重點：${res.guidance.rule}
+
+請依照以下結構為問卜者解析（使用繁體中文，語氣溫和誠懇，避免迷信恐嚇）：
+1. 【核心總斷】：一句話點出針對此問題的整體趨勢與吉凶方向。
+2. 【本卦與卦辭啟示】：引用並白話解釋本卦卦辭，說明目前的處境、優勢與潛在盲點。
+3. 【動爻與變卦解析】：依據上述「傳統斷卦重點」，引用相關的關鍵爻辭（或變卦卦辭）白話解析，說明事情接下來的演變方向。
+4. 【具體行動建議與提醒】：給問卜者在現實決策與心態調整上的 3 點具體建議。`;
+      }
+
+      async function callAiApi(promptText, cfg) {
+        if (cfg.provider === "gemini") {
+          const userApiKey = cfg.apiKey;
+          const modelName = cfg.model || "gemini-3-flash-preview";
+          const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelName)}:generateContent?key=${encodeURIComponent(userApiKey)}`;
+          const response = await fetch(apiUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: promptText }] }],
+            }),
+          });
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(
+              data.error?.message || `Gemini API 錯誤 (${response.status})`,
+            );
+          }
+          const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (!text) throw new Error("Gemini 未回傳有效文字內容");
+          return text;
+        } else {
+          const response = await fetch(
+            "https://api.openai.com/v1/chat/completions",
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${cfg.apiKey}`,
+              },
+              body: JSON.stringify({
+                model: cfg.model || "gpt-4o-mini",
+                messages: [
+                  {
+                    role: "system",
+                    content:
+                      "你是精通《易經》義理與象數的解卦顧問，請以繁體中文提供條理清晰、白話貼切的解析。",
+                  },
+                  { role: "user", content: promptText },
+                ],
+                temperature: 0.7,
+              }),
+            },
+          );
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(
+              data.error?.message || `OpenAI API 錯誤 (${response.status})`,
+            );
+          }
+          const text = data.choices?.[0]?.message?.content;
+          if (!text) throw new Error("OpenAI 未回傳有效文字內容");
+          return text;
+        }
+      }
+
+      els.askAiBtn.addEventListener("click", async () => {
+        if (state.yaos.length < 6) {
+          showToast("請先完成六次擲幣成卦");
+          return;
+        }
+
+        const cfg = getApiConfig();
+        if (!cfg.apiKey || !cfg.apiKey.trim()) {
+          showToast("請先設定您的 API Key（僅存於本機瀏覽器）");
+          openApiModal();
+          return;
+        }
+
+        const res = calculateDivinationResult();
+        const promptText = buildDivinationPrompt(res);
+
+        els.askAiBtn.disabled = true;
+        els.askAiBtn.textContent = "⏳ 正在推演卦辭與爻辭中...";
+        els.aiOutputBox.classList.add("active");
+        els.aiOutputBox.textContent = "靜心推演中，請稍候數秒...";
+
+        try {
+          const aiText = await callAiApi(promptText, cfg);
+          els.aiOutputBox.textContent = aiText;
+
+          if (state.currentRecordId) {
+            updateHistoryAiText(state.currentRecordId, aiText);
+          }
+          showToast("AI 解卦完成，已自動存入歷史紀錄");
+        } catch (err) {
+          els.aiOutputBox.textContent = `❌ 解卦失敗：${err.message}\n\n請點擊右上角「⚙️ API 設定」檢查您的 API Key 是否正確、額度是否充足，或確認模型名稱。`;
+        } finally {
+          els.askAiBtn.disabled = false;
+          els.askAiBtn.textContent = "✨ 重新產生 AI 解卦";
+        }
+      });
+
+      // 一鍵複製卦象文字
+      els.copyResultBtn.addEventListener("click", async () => {
+        if (state.yaos.length < 6) return;
+        const res = calculateDivinationResult();
+        const yaoLines = state.yaos
+          .map((y, i) => `${YAO_POS_NAMES[i]}：${y.label}`)
+          .join("｜");
+        const text = `【易經三枚銅板起卦】\n所問之事：${state.question}\n六爻明細：${yaoLines}\n本卦：${res.benHex.full}\n變卦：${res.movingIndices.length === 0 ? "無變卦" : res.bianHex.full}\n動爻：${res.guidance.posText}`;
+        try {
+          await navigator.clipboard.writeText(text);
+          showToast("已複製卦象摘要至剪貼簿！");
+        } catch {
+          showToast("複製失敗，請手動選取文字複製");
+        }
+      });
+
+      /* =========================================
+       10. 本機歷史占卜紀錄管理 (localStorage)
+       ========================================= */
+      function loadHistory() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEYS.HISTORY);
+          return raw ? JSON.parse(raw) : [];
+        } catch {
+          return [];
+        }
+      }
+
+      function saveHistoryRecord(record) {
+        const list = loadHistory();
+        list.unshift(record);
+        localStorage.setItem(
+          STORAGE_KEYS.HISTORY,
+          JSON.stringify(list.slice(0, 50)),
+        );
+        renderHistory();
+      }
+
+      function updateHistoryAiText(id, aiText) {
+        const list = loadHistory();
+        const target = list.find((item) => item.id === id);
+        if (target) {
+          target.aiInterpretation = aiText;
+          localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(list));
+          renderHistory();
+        }
+      }
+
+      function deleteHistoryItem(id) {
+        const list = loadHistory().filter((item) => item.id !== id);
+        localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(list));
+        renderHistory();
+        showToast("已刪除該筆占卜紀錄");
+      }
+
+      function renderHistory() {
+        const list = loadHistory();
+        if (list.length === 0) {
+          els.historyList.innerHTML = `
+          <div style="color:var(--ink-muted); font-size:0.9rem; text-align:center; padding:16px;">
+            尚無占卜紀錄，完成一次六爻起卦後將自動保存於此。
+          </div>`;
+          return;
+        }
+
+        els.historyList.innerHTML = "";
+        list.forEach((item) => {
+          const card = document.createElement("div");
+          card.className = "history-item";
+
+          const header = document.createElement("div");
+          header.className = "history-header";
+
+          const infoDiv = document.createElement("div");
+          infoDiv.innerHTML = `
+          <div class="history-q">問：${escapeHtml(item.question)}</div>
+          <div class="history-meta">
+            ${escapeHtml(item.timestamp)} ｜ 本卦：<strong>${escapeHtml(item.benGua)}</strong> → 變卦：<strong>${escapeHtml(item.bianGua)}</strong>（${escapeHtml(item.movingText)}）
+          </div>
+        `;
+
+          const btnGroup = document.createElement("div");
+          btnGroup.style.display = "flex";
+          btnGroup.style.gap = "6px";
+
+          const toggleBtn = document.createElement("button");
+          toggleBtn.type = "button";
+          toggleBtn.className = "btn-outline btn-sm";
+          toggleBtn.textContent = "展開詳情";
+
+          const delBtn = document.createElement("button");
+          delBtn.type = "button";
+          delBtn.className = "btn-outline btn-sm";
+          delBtn.style.color = "var(--cinnabar)";
+          delBtn.textContent = "刪除";
+          delBtn.addEventListener("click", () => deleteHistoryItem(item.id));
+
+          btnGroup.appendChild(toggleBtn);
+          btnGroup.appendChild(delBtn);
+
+          header.appendChild(infoDiv);
+          header.appendChild(btnGroup);
+
+          const detail = document.createElement("div");
+          detail.className = "history-detail";
+          detail.textContent = `【六爻明細】\n${item.yaosSummary}\n\n【AI 解卦內容】\n${item.aiInterpretation || "（此筆占卜尚未執行 AI 解卦）"}`;
+
+          toggleBtn.addEventListener("click", () => {
+            const isOpen = detail.classList.toggle("open");
+            toggleBtn.textContent = isOpen ? "收合詳情" : "展開詳情";
+          });
+
+          card.appendChild(header);
+          card.appendChild(detail);
+          els.historyList.appendChild(card);
+        });
+      }
+
+      els.clearHistoryBtn.addEventListener("click", () => {
+        const list = loadHistory();
+        if (list.length === 0) return;
+        if (
+          confirm(
+            "確定要清空所有保存在本機瀏覽器的占卜紀錄嗎？此動作無法復原。",
+          )
+        ) {
+          localStorage.removeItem(STORAGE_KEYS.HISTORY);
+          renderHistory();
+          showToast("已清空全部歷史占卜紀錄");
+        }
+      });
+
+      function escapeHtml(str) {
+        return String(str)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      }
+
+      // 啟動初始化
+      updateApiStatusUI();
+      renderYaoBoard();
+      updateThrowControls();
+      renderHistory();
+    </script>
+  </body>
+</html>

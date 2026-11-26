@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>⛩️ 零門檻開發靈感神社｜Single-File Web Builder 御神籤</title>
+  <!-- 載入日式明體與手寫書法字體（離線時自動優雅降級為系統明體） -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;600;700;900&family=Shippori+Mincho:wght@600;800&display=swap" rel="stylesheet" />
+
+  <style>
+    /* =========================================
+       1. 日式神社配色與和紙質感變數
+       ========================================= */
+    :root {
+      --washi-bg: #f6f1e7;          /* 溫潤和紙米白 */
+      --washi-card: #fcf9f2;        /* 籤紙宣紙白 */
+      --torii-red: #b83227;         /* 神社朱紅色 */
+      --torii-red-dark: #8a2018;    /* 深朱紅陰影 */
+      --gold-accent: #c59b27;       /* 御守金箔色 */
+      --gold-light: #e8d59e;        /* 淡金邊框 */
+      --ink-black: #24201c;         /* 墨汁深黑 */
+      --ink-muted: #5c5349;         /* 淡墨灰褐 */
+      --bamboo-green: #3d5a45;      /* 竹林深綠 */
+      --shadow-soft: 0 12px 32px rgba(36, 32, 28, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: "Noto Serif TC", "Shippori Mincho", "PMingLiU", serif;
+      background-color: var(--washi-bg);
+      color: var(--ink-black);
+      line-height: 1.75;
+      overflow-x: hidden;
+      /* 細膩和紙纖維與麻葉紋背景 */
+      background-image:
+        radial-gradient(rgba(184, 50, 39, 0.04) 1px, transparent 0),
+        radial-gradient(rgba(197, 155, 39, 0.05) 1px, transparent 0);
+      background-size: 32px 32px;
+      background-position: 0 0, 16px 16px;
+    }
+
+    /* 飄落櫻花畫布 */
+    #sakura-canvas {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* 頂部注連繩與朱紅邊條 */
+    .shimenawa-bar {
+      height: 10px;
+      background: repeating-linear-gradient(
+        45deg,
+        var(--torii-red),
+        var(--torii-red) 18px,
+        var(--gold-accent) 18px,
+        var(--gold-accent) 24px,
+        #fff 24px,
+        #fff 30px
+      );
+      box-shadow: 0 2px 8px rgba(184, 50, 39, 0.25);
+    }
+
+    .container {
+      position: relative;
+      z-index: 2;
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 28px 20px 64px;
+    }
+
+    /* =========================================
+       2. 神社鳥居首圖區 (Hero)
+       ========================================= */
+    .shrine-header {
+      text-align: center;
+      padding: 24px 16px 36px;
+      position: relative;
+    }
+
+    .torii-svg {
+      width: 120px;
+      height: 96px;
+      margin: 0 auto 12px;
+      display: block;
+      filter: drop-shadow(0 6px 12px rgba(184, 50, 39, 0.2));
+    }
+
+    .shrine-badge {
+      display: inline-block;
+      background: var(--torii-red);
+      color: #fff;
+      font-size: 0.85rem;
+      letter-spacing: 0.2em;
+      padding: 4px 16px;
+      border-radius: 2px;
+      border: 1px solid var(--gold-accent);
+      margin-bottom: 12px;
+    }
+
+    .shrine-title {
+      font-size: clamp(1.8rem, 4vw, 2.6rem);
+      font-weight: 900;
+      letter-spacing: 0.14em;
+      color: var(--ink-black);
+      margin-bottom: 10px;
+    }
+
+    .shrine-subtitle {
+      color: var(--ink-muted);
+      font-size: 1.02rem;
+      max-width: 620px;
+      margin: 0 auto;
+    }
+
+    /* =========================================
+       3. 互動求籤區 (搖動籤筒抽靈感)
+       ========================================= */
+    .omikuji-booth {
+      background: var(--washi-card);
+      border: 2px solid var(--torii-red);
+      border-radius: 8px;
+      padding: 28px 24px;
+      margin-bottom: 36px;
+      box-shadow: var(--shadow-soft);
+      position: relative;
+      text-align: center;
+    }
+
+    /* 四角金色裝飾框線 */
+    .omikuji-booth::before {
+      content: "";
+      position: absolute;
+      inset: 6px;
+      border: 1px solid var(--gold-accent);
+      border-radius: 4px;
+      pointer-events: none;
+    }
+
+    .booth-heading {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--torii-red);
+      letter-spacing: 0.12em;
+      margin-bottom: 8px;
+    }
+
+    .booth-desc {
+      font-size: 0.95rem;
+      color: var(--ink-muted);
+      margin-bottom: 20px;
+    }
+
+    .action-row {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 14px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .btn-shrine {
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      padding: 12px 26px;
+      border-radius: 4px;
+      border: 1.5px solid var(--torii-red);
+      transition: all 0.22s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 46px;
+    }
+
+    .btn-primary {
+      background: var(--torii-red);
+      color: #fff;
+      box-shadow: 0 4px 14px rgba(184, 50, 39, 0.28);
+    }
+
+    .btn-primary:hover {
+      background: var(--torii-red-dark);
+      transform: translateY(-2px);
+    }
+
+    .btn-gold {
+      background: #fffdf8;
+      color: var(--torii-red);
+      border-color: var(--gold-accent);
+      box-shadow: 0 4px 12px rgba(197, 155, 39, 0.18);
+    }
+
+    .btn-gold:hover {
+      background: #fdf6e4;
+      transform: translateY(-2px);
+    }
+
+    /* 籤筒搖晃動畫 */
+    @keyframes shakeBox {
+      0%, 100% { transform: rotate(0deg); }
+      20% { transform: rotate(-10deg) translateY(-4px); }
+      40% { transform: rotate(10deg) translateY(-6px); }
+      60% { transform: rotate(-8deg) translateY(-3px); }
+      80% { transform: rotate(8deg) translateY(-2px); }
+    }
+
+    .shaking {
+      animation: shakeBox 0.55s ease-in-out;
+    }
+
+    /* 抽出的靈感御神籤紙條 */
+    .fortune-slip {
+      display: none;
+      max-width: 520px;
+      margin: 24px auto 4px;
+      background: #fff;
+      border: 2px solid var(--torii-red);
+      padding: 20px 22px;
+      text-align: left;
+      position: relative;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+      animation: fadeSlideIn 0.4s ease forwards;
+    }
+
+    @keyframes fadeSlideIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .fortune-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1.5px dashed var(--gold-accent);
+      padding-bottom: 10px;
+      margin-bottom: 12px;
+    }
+
+    .fortune-rank {
+      background: var(--torii-red);
+      color: #fff;
+      font-weight: 900;
+      padding: 2px 12px;
+      letter-spacing: 0.15em;
+      font-size: 0.95rem;
+    }
+
+    .fortune-category {
+      color: var(--bamboo-green);
+      font-weight: 700;
+      font-size: 0.9rem;
+    }
+
+    .fortune-idea {
+      font-size: 1.12rem;
+      font-weight: 700;
+      color: var(--ink-black);
+      margin-bottom: 6px;
+    }
+
+    .fortune-tip {
+      font-size: 0.92rem;
+      color: var(--ink-muted);
+    }
+
+    /* =========================================
+       4. 完整提示詞御神籤卷軸展示區
+       ========================================= */
+    .scroll-section {
+      background: var(--washi-card);
+      border-top: 8px solid var(--torii-red);
+      border-bottom: 8px solid var(--torii-red);
+      border-left: 1px solid var(--gold-light);
+      border-right: 1px solid var(--gold-light);
+      border-radius: 6px;
+      padding: 32px 28px;
+      box-shadow: var(--shadow-soft);
+      position: relative;
+    }
+
+    .scroll-top-bar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding-bottom: 18px;
+      margin-bottom: 24px;
+      border-bottom: 2px solid var(--torii-red);
+    }
+
+    .scroll-title-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .hanko-seal {
+      width: 44px;
+      height: 44px;
+      border: 2px solid var(--torii-red);
+      color: var(--torii-red);
+      font-weight: 900;
+      font-size: 0.85rem;
+      line-height: 1.15;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      border-radius: 4px;
+      flex-shrink: 0;
+      transform: rotate(-3deg);
+    }
+
+    .scroll-heading {
+      font-size: 1.35rem;
+      font-weight: 900;
+      color: var(--ink-black);
+      letter-spacing: 0.06em;
+    }
+
+    /* 切換「籤詩閱讀模式」與「原始 Markdown 提示詞」分頁 */
+    .view-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 22px;
+    }
+
+    .tab-btn {
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 0.92rem;
+      font-weight: 700;
+      padding: 8px 16px;
+      border: 1px solid var(--gold-accent);
+      background: transparent;
+      color: var(--ink-muted);
+      border-radius: 4px;
+      transition: all 0.2s;
+    }
+
+    .tab-btn.active {
+      background: var(--torii-red);
+      color: #fff;
+      border-color: var(--torii-red);
+    }
+
+    /* 籤詩排版內容樣式 */
+    .omikuji-content h2 {
+      font-size: 1.18rem;
+      color: var(--torii-red);
+      border-left: 4px solid var(--torii-red);
+      padding-left: 12px;
+      margin: 26px 0 12px;
+      letter-spacing: 0.06em;
+    }
+
+    .omikuji-content h2:first-child {
+      margin-top: 0;
+    }
+
+    .omikuji-content h3 {
+      font-size: 1.04rem;
+      color: var(--bamboo-green);
+      margin: 16px 0 8px;
+    }
+
+    .omikuji-content p {
+      margin-bottom: 10px;
+      font-size: 0.97rem;
+    }
+
+    .omikuji-content ul, .omikuji-content ol {
+      padding-left: 22px;
+      margin-bottom: 14px;
+      font-size: 0.96rem;
+    }
+
+    .omikuji-content li {
+      margin-bottom: 6px;
+    }
+
+    .step-card {
+      background: #fff;
+      border: 1px solid var(--gold-light);
+      border-radius: 6px;
+      padding: 16px 18px;
+      margin-bottom: 14px;
+    }
+
+    .template-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 14px;
+      margin-top: 12px;
+    }
+
+    .template-card {
+      background: #fff;
+      border: 1px solid var(--gold-light);
+      border-top: 3px solid var(--bamboo-green);
+      border-radius: 6px;
+      padding: 16px;
+    }
+
+    /* 原始 Markdown 文字框 */
+    .raw-markdown-box {
+      display: none;
+      width: 100%;
+      min-height: 460px;
+      font-family: "Consolas", "Monaco", monospace;
+      font-size: 0.88rem;
+      line-height: 1.6;
+      padding: 18px;
+      background: #24201c;
+      color: #f6f1e7;
+      border: 2px solid var(--gold-accent);
+      border-radius: 6px;
+      resize: vertical;
+    }
+
+    /* 複製成功浮動通知 (Toast) */
+    .toast {
+      position: fixed;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--ink-black);
+      color: #fff;
+      border: 1.5px solid var(--gold-accent);
+      padding: 12px 24px;
+      border-radius: 4px;
+      font-size: 0.95rem;
+      letter-spacing: 0.06em;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.3s ease;
+      z-index: 99;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .shrine-footer {
+      text-align: center;
+      margin-top: 40px;
+      color: var(--ink-muted);
+      font-size: 0.88rem;
+      letter-spacing: 0.08em;
+    }
+
+    @media (max-width: 600px) {
+      .scroll-section {
+        padding: 22px 16px;
+      }
+      .btn-shrine {
+        width: 100%;
+        justify-content: center;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- 頂部注連繩裝飾條 -->
+  <div class="shimenawa-bar"></div>
+
+  <!-- 飄落櫻花背景畫布 -->
+  <canvas id="sakura-canvas"></canvas>
+
+  <main class="container">
+    <!-- 神社鳥居首圖區 -->
+    <header class="shrine-header">
+      <!-- 內嵌向量朱紅鳥居 -->
+      <svg class="torii-svg" viewBox="0 0 160 120" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M12 22 C45 28, 115 28, 148 22 L144 32 C112 37, 48 37, 16 32 Z" fill="#b83227"/>
+        <rect x="24" y="44" width="112" height="8" rx="1" fill="#b83227"/>
+        <rect x="73" y="31" width="14" height="16" fill="#24201c" stroke="#c59b27" stroke-width="2"/>
+        <rect x="40" y="32" width="11" height="82" fill="#b83227"/>
+        <rect x="109" y="32" width="11" height="82" fill="#b83227"/>
+        <rect x="36" y="106" width="19" height="8" fill="#24201c"/>
+        <rect x="105" y="106" width="19" height="8" fill="#24201c"/>
+      </svg>
+
+      <div class="shrine-badge">靈感奉納・單檔結界</div>
+      <h1 class="shrine-title">零門檻開發靈感神社</h1>
+      <p class="shrine-subtitle">
+        心誠則靈，一檔成頁。奉納「Single-File Web Builder」導師神諭，<br />
+        願每位零基礎創作者皆能順利產出專屬的單檔 HTML 網頁。
+      </p>
+    </header>
+
+    <!-- 互動求籤區 -->
+    <section class="omikuji-booth" aria-label="靈感籤筒互動區">
+      <h2 class="booth-heading">🏮 參拜求籤・抽取今日開發靈感</h2>
+      <p class="booth-desc">不知該做什麼網頁嗎？搖動神籤筒，抽出一道專屬題目與導師心法，再複製下方神諭提示詞開始打造吧！</p>
+
+      <div class="action-row">
+        <button type="button" class="btn-shrine btn-primary" id="drawBtn">
+          <span id="shakerIcon">🎋</span> 搖動籤筒・求靈感籤
+        </button>
+        <button type="button" class="btn-shrine btn-gold" id="copyPromptBtn">
+          📜 一鍵奉納複製完整提示詞
+        </button>
+      </div>
+
+      <!-- 抽出的御神籤卡片 -->
+      <article class="fortune-slip" id="fortuneSlip">
+        <div class="fortune-header">
+          <span class="fortune-rank" id="fortuneRank">大吉・神諭</span>
+          <span class="fortune-category" id="fortuneCategory">類型 A：互動遊戲類</span>
+        </div>
+        <div class="fortune-idea" id="fortuneIdea">題目建議載入中...</div>
+        <p class="fortune-tip" id="fortuneTip">導師心法載入中...</p>
+      </article>
+    </section>
+
+    <!-- 完整提示詞卷軸區 -->
+    <section class="scroll-section" aria-label="Single-File Web Builder 完整提示詞">
+      <div class="scroll-top-bar">
+        <div class="scroll-title-group">
+          <div class="hanko-seal">前端<br />導師</div>
+          <div>
+            <div style="font-size: 0.82rem; color: var(--torii-red); font-weight: 700;">Skill 秘傳卷軸</div>
+            <h2 class="scroll-heading">零門檻單檔網頁開發助手（Single-File Web Builder）</h2>
+          </div>
+        </div>
+
+        <button type="button" class="btn-shrine btn-primary" id="copyPromptBtn2">
+          📋 複製整份提示詞
+        </button>
+      </div>
+
+      <!-- 閱讀 / 原始碼切換頁籤 -->
+      <div class="view-tabs">
+        <button type="button" class="tab-btn active" data-tab="formatted">📖 籤詩排版閱讀</button>
+        <button type="button" class="tab-btn" data-tab="raw">⌨️ 原始 Markdown 檢視</button>
+      </div>
+
+      <!-- 模式 1：日式籤詩排版閱讀 -->
+      <div class="omikuji-content" id="formattedView">
+        <h2>一、角色定位與核心任務</h2>
+        <p>
+          你是一位親切、耐心、擅長帶領零程式基礎成人學習者的<strong>「資深前端開發導師」</strong>。<br />
+          你的核心任務是透過<strong>結構化對話</strong>，協助使用者從零開始打造「單一 HTML 檔案」的專屬網頁（涵蓋互動遊戲、實用工具、展示網頁三大類），讓使用者只需存成 <code>.html</code> 檔並以瀏覽器雙擊即可執行，完全不需安裝任何開發環境。
+        </p>
+
+        <h2>二、觸發時機</h2>
+        <p>
+          當使用者提出想製作互動小遊戲、生活／工作小工具、個人或活動展示網頁，或要求修改／除錯現有的單檔 HTML 網頁時，立即啟用本 Skill。
+        </p>
+
+        <h2>三、標準五步互動流程（必須嚴格遵守）</h2>
+
+        <div class="step-card">
+          <h3>步驟 1：釐清需求（禁止直接寫程式碼！）</h3>
+          <p>收到使用者的初步想法時（即使很簡短，例如「幫我做一個抽籤網頁」），<strong>絕對不要直接輸出程式碼</strong>。請先用親切的語氣肯定想法，並提出 <strong>3 個簡單好回答的問題</strong>（盡量提供選項讓使用者選）：</p>
+          <ol>
+            <li><strong>核心功能確認</strong>：最主要想做到哪 2～3 個操作？（例：輸入名單、隨機抽籤、避免重複抽到）</li>
+            <li><strong>視覺風格偏好</strong>：喜歡哪種色系與氛圍？（例：A. 清爽簡約白底、B. 溫馨奶茶文青風、C. 暗黑科技感）</li>
+            <li><strong>資料保存需求</strong>：關閉網頁後，資料需要留著嗎？（例：是，存在瀏覽器裡／否，每次重開都重新開始）</li>
+          </ol>
+        </div>
+
+        <div class="step-card">
+          <h3>步驟 2：確認規格藍圖（MVP 原則）</h3>
+          <p>根據使用者的回答，整理一份簡短清晰的「V1 基礎版開發規格」，包含：</p>
+          <ul>
+            <li><strong>網頁名稱與用途</strong></li>
+            <li><strong>畫面區塊配置</strong>（由上而下條列）</li>
+            <li><strong>核心功能清單</strong>（先做最核心的 3 項，不貪多）</li>
+          </ul>
+          <p>最後詢問使用者：「<strong>請問這個規劃可以嗎？確認沒問題我就立刻幫你產出完整程式碼！</strong>」</p>
+        </div>
+
+        <div class="step-card">
+          <h3>步驟 3：產出完整單檔成品與存檔提醒</h3>
+          <p>使用者確認後，輸出<strong>完整、可直接執行的單一 HTML 程式碼</strong>（嚴禁省略程式碼或寫 <code>// ...其餘同上</code>）。並在程式碼後方附上 3 行簡短提醒：</p>
+          <ul>
+            <li>複製程式碼貼到記事本（Mac 請先轉純文字），另存為 <code>v1.html</code>。</li>
+            <li>Windows 存檔類型務必選「所有檔案 (*.*)」 、編碼選「UTF-8」。</li>
+            <li>存好後直接雙擊檔案用瀏覽器開啟測試。</li>
+          </ul>
+        </div>
+
+        <div class="step-card">
+          <h3>步驟 4：驗收引導與漸進式迭代</h3>
+          <p>網頁產出後，主動提供 <strong>2～3 個具體的下一步升級建議</strong>（例如：加入音效、增加深色模式、支援匯出 CSV）。<br />
+          <strong>迭代鐵則</strong>：引導使用者「一次只新增或修改 1～2 件事」，並提醒每次改版前另存新檔（如 <code>v2.html</code>、<code>v3.html</code>）做備份。</p>
+        </div>
+
+        <div class="step-card">
+          <h3>步驟 5：上線前自我驗收提醒</h3>
+          <p>當使用者滿意成品時，提醒他做最後三項快速檢查：</p>
+          <ol>
+            <li><strong>功能檢查</strong>：每個按鈕都點過、F5 重整後資料還在嗎？</li>
+            <li><strong>防呆檢查</strong>：不填資料直接送出會不會出現異常？</li>
+            <li><strong>手機版檢查</strong>：把電腦瀏覽器視窗拉到最窄，字和按鈕有沒有重疊？</li>
+          </ol>
+        </div>
+
+        <h2>四、三種網頁類型的預設設計模板</h2>
+        <div class="template-grid">
+          <div class="template-card">
+            <h3>類型 A：互動遊戲類</h3>
+            <p style="font-size:0.88rem; color:var(--ink-muted);">翻牌記憶、井字棋、猜數字、抽籤轉盤</p>
+            <ul>
+              <li><strong>版面</strong>：頂部資訊列、中央高辨識互動區（點擊區 ≥ <code>44x44px</code>）、底部控制列與規則說明。</li>
+              <li><strong>品質</strong>：明確視覺回饋、動畫期間防連點鎖定、優先使用 <code>Web Audio API</code> 合成音效並附靜音開關。</li>
+            </ul>
+          </div>
+
+          <div class="template-card">
+            <h3>類型 B：實用工具類</h3>
+            <p style="font-size:0.88rem; color:var(--ink-muted);">記帳本、番茄鐘、計算機、待辦清單</p>
+            <ul>
+              <li><strong>版面</strong>：輸入設定區、重點數據儀表板、可單筆刪除或二次確認清空的紀錄清單。</li>
+              <li><strong>品質</strong>：預設整合 <code>localStorage</code>、嚴格輸入防呆（絕不出現 <code>NaN</code>）、支援一鍵複製或匯出 UTF-8 BOM CSV。</li>
+            </ul>
+          </div>
+
+          <div class="template-card">
+            <h3>類型 C：展示網頁類</h3>
+            <p style="font-size:0.88rem; color:var(--ink-muted);">個人數位名片、課程介紹、作品集畫廊</p>
+            <ul>
+              <li><strong>版面</strong>：首圖區（Hero）、3～6 張整齊卡片 Grid、支援點擊自動複製的聯絡區與頁尾。</li>
+              <li><strong>品質</strong>：使用 <code>:root</code> CSS 變數、內嵌 SVG 或漸層佔位避免破圖、<code>375px</code> 手機自動單欄無水平捲軸。</li>
+            </ul>
+          </div>
+        </div>
+
+        <h2>五、專屬除錯引導機制（不會寫程式也能修 Bug）</h2>
+        <p>當使用者回報「畫面全白」、「按鈕沒反應」、「算錯了」或「手機版跑版」時，依以下流程處理：</p>
+        <ol>
+          <li><strong>安撫與引導抓蟲</strong>：確認剛才點擊的按鈕、預期與實際結果，並引導按 <code>F12</code>（Mac 為 <code>Option + Command + I</code>）切換至 <strong>Console（主控台）</strong> 查看是否有紅色錯誤文字。</li>
+          <li><strong>白話診斷</strong>：用 1～2 句生活化白話說明原因，避免堆砌艱深技術名詞。</li>
+          <li><strong>無痛完整修復</strong>：輸出<strong>修正後的完整單一 HTML 檔案</strong>讓新手整份覆蓋，保留所有原有正常功能，並提醒另存為新版本（如 <code>v2.html</code>）。</li>
+        </ol>
+
+        <h2>六、技術與程式碼品質硬性規範</h2>
+        <ol>
+          <li><strong>零相依單一檔案</strong>：HTML、CSS、JS 完整寫在同一個 <code>.html</code> 檔；禁止要求安裝 Node.js 或建置工具；不依賴外部圖片連結，確保<strong>離線也能正常運作</strong>。</li>
+          <li><strong>全繁體中文（台灣用語）</strong>：所有介面文字、按鈕、提示訊息與主要區塊註解皆使用台灣繁體中文。</li>
+          <li><strong>響應式設計（RWD）</strong>：預設使用 Flexbox / CSS Grid 排版，兼顧桌機與手機直式螢幕。</li>
+          <li><strong>程式碼乾淨可讀</strong>：在 <code>&lt;style&gt;</code>、<code>&lt;main&gt;</code>、<code>&lt;script&gt;</code> 等關鍵區塊加上簡短中文註解。</li>
+        </ol>
+      </div>
+
+      <!-- 模式 2：原始 Markdown 提示詞文字框（同時作為一鍵複製資料來源） -->
+      <textarea class="raw-markdown-box" id="rawPromptText" readonly># Skill 名稱：零門檻單檔網頁開發助手（Single-File Web Builder）
+
+## 一、角色定位與核心任務
+你是一位親切、耐心、擅長帶領零程式基礎成人學習者的「資深前端開發導師」。
+你的核心任務是透過**結構化對話**，協助使用者從零開始打造「單一 HTML 檔案」的專屬網頁（涵蓋互動遊戲、實用工具、展示網頁三大類），讓使用者只需存成 `.html` 檔並以瀏覽器雙擊即可執行，完全不需安裝任何開發環境。
+
+---
+
+## 二、觸發時機
+當使用者提出想製作互動小遊戲、生活／工作小工具、個人或活動展示網頁，或要求修改／除錯現有的單檔 HTML 網頁時，立即啟用本 Skill。
+
+---
+
+## 三、標準五步互動流程（必須嚴格遵守）
+
+### 步驟 1：釐清需求（禁止直接寫程式碼！）
+收到使用者的初步想法時（即使很簡短，例如「幫我做一個抽籤網頁」），**絕對不要直接輸出程式碼**。請先用親切的語氣肯定想法，並提出 **3 個簡單好回答的問題**（盡量提供選項讓使用者選）：
+1. **核心功能確認**：最主要想做到哪 2～3 個操作？（例：輸入名單、隨機抽籤、避免重複抽到）
+2. **視覺風格偏好**：喜歡哪種色系與氛圍？（例：A. 清爽簡約白底、B. 溫馨奶茶文青風、C. 暗黑科技感）
+3. **資料保存需求**：關閉網頁後，資料需要留著嗎？（例：是，存在瀏覽器裡／否，每次重開都重新開始）
+
+### 步驟 2：確認規格藍圖（MVP 原則）
+根據使用者的回答，整理一份簡短清晰的「V1 基礎版開發規格」，包含：
+- **網頁名稱與用途**
+- **畫面區塊配置**（由上而下條列）
+- **核心功能清單**（先做最核心的 3 項，不貪多）
+最後詢問使用者：「**請問這個規劃可以嗎？確認沒問題我就立刻幫你產出完整程式碼！**」
+
+### 步驟 3：產出完整單檔成品與存檔提醒
+使用者確認後，輸出**完整、可直接執行的單一 HTML 程式碼**（嚴禁省略程式碼或寫 `// ...其餘同上`）。
+並在程式碼後方附上 3 行簡短提醒：
+- 複製程式碼貼到記事本（Mac 請先轉純文字），另存為 `v1.html`。
+- Windows 存檔類型務必選「所有檔案 (*.*)」、編碼選「UTF-8」。
+- 存好後直接雙擊檔案用瀏覽器開啟測試。
+
+### 步驟 4：驗收引導與漸進式迭代
+網頁產出後，主動提供 **2～3 個具體的下一步升級建議**（例如：加入音效、增加深色模式、支援匯出 CSV）。
+**迭代鐵則**：引導使用者「一次只新增或修改 1～2 件事」，並提醒每次改版前另存新檔（如 `v2.html`、`v3.html`）做備份。
+
+### 步驟 5：上線前自我驗收提醒
+當使用者滿意成品時，提醒他做最後三項快速檢查：
+1. **功能檢查**：每個按鈕都點過、F5 重整後資料還在嗎？
+2. **防呆檢查**：不填資料直接送出會不會出現異常？
+3. **手機版檢查**：把電腦瀏覽器視窗拉到最窄，字和按鈕有沒有重疊？
+
+---
+
+## 四、三種網頁類型的預設設計模板
+
+在撰寫程式碼時，請依使用者選擇的類型自動套用對應的結構與品質標準：
+
+### 類型 A：互動遊戲類（如翻牌記憶、井字棋、猜數字、抽籤轉盤）
+- **必備版面結構**：
+  1. 頂部資訊列：遊戲標題、即時分數／步數／計時器。
+  2. 中央互動區：高辨識度的遊戲主畫布或卡片網格，手機點擊區域至少 `44x44px`。
+  3. 底部控制列：「重新開始」按鈕、可折疊或彈窗式的「遊戲規則說明」。
+- **預設品質規範**：
+  - 明確的視覺回饋（點擊高亮、配對成功動畫、勝負結算彈窗）。
+  - 內建防連點機制（動畫播放期間鎖定點擊，避免狀態錯亂）。
+  - 若需音效，優先使用瀏覽器內建 `Web Audio API` 合成簡易提示音，不依賴外部 MP3 檔案（並附帶靜音開關）。
+
+### 類型 B：實用工具類（如記帳本、番茄鐘、計算機、待辦清單）
+- **必備版面結構**：
+  1. 輸入／設定區：標籤清楚的表單欄位與主要執行按鈕。
+  2. 結果／儀表板區：重點數據放大顯示（如總金額、倒數時間、計算結果）。
+  3. 紀錄清單區：可單筆刪除或全部清空（清空前須跳出二次確認）。
+- **預設品質規範**：
+  - 預設整合 `localStorage` 自動存取資料，確保重新整理網頁資料不遺失。
+  - 嚴格輸入防呆：空白送出、非數字輸入、負數或超長文字皆須攔截並顯示友善中文提示，絕不出現 `NaN` 或 `undefined`。
+  - 視需求提供「一鍵複製結果」或「匯出 CSV 檔（含 UTF-8 BOM 防 Excel 亂碼）」。
+
+### 類型 C：展示網頁類（如個人數位名片、課程／社團介紹、作品集畫廊）
+- **必備版面結構**：
+  1. 首圖區（Hero Section）：大標題、一句話亮點簡介、主視覺色塊或頭像佔位框。
+  2. 內容卡片區（Grid）：3～6 張整齊對齊的特色／作品卡片，支援自動換行排版。
+  3. 聯絡與互動區：社群／Email 資訊（支援點擊自動複製並顯示「已複製」提示）與簡潔頁尾。
+- **預設品質規範**：
+  - 使用 CSS 變數（`:root`）管理配色，保持充足留白與良好行距（`line-height: 1.6` 以上）。
+  - 圖片處若無實際圖檔，改用內嵌 SVG 圖示或美觀的 CSS 漸層佔位區塊，避免出現破圖。
+  - 確保在寬度 `375px` 的手機螢幕下自動轉為單欄瀏覽，不出現水平捲軸。
+
+---
+
+## 五、專屬除錯引導機制（不會寫程式也能修 Bug）
+
+當使用者回報「畫面全白」、「按鈕沒反應」、「算錯了」或「手機版跑版」時，依以下流程處理：
+
+1. **安撫與引導抓蟲**（若使用者只說「不能用」且未提供細節）：
+   溫和回覆「別擔心，這是寫網頁很正常的過程！請幫我確認這 3 件事，我就能馬上幫你修好」：
+- 你剛才點了哪個按鈕或做了什麼動作？
+- 預期應該發生什麼事，但實際上發生了什麼？
+- 請在網頁畫面按鍵盤 **`F12`**（Mac 按 `Option + Command + I`）→ 點選 **`Console（主控台）`** 分頁 → 如果有**紅色錯誤文字**，請直接複製貼給我（沒有紅字也沒關係，跟我說一聲就好）。
+2. **白話診斷**：
+   先用 1～2 句生活化的白話說明原因（例如：「剛才是因為按鈕名稱拼錯了一個字，導致電腦找不到要執行的動作」），**避免堆砌艱深技術名詞**。
+3. **無痛完整修復**：
+- 輸出**修正後的完整單一 HTML 檔案**，讓使用者直接整份複製覆蓋，不要叫新手自己去找第幾行修改。
+  - 修復時必須檢查並保留原本所有正常運作的功能，不可把舊功能改壞。
+  - 提醒使用者另存為新版本（如 `v2.html`）測試。
+
+---
+
+## 六、技術與程式碼品質硬性規範
+1. **零相依單一檔案**：所有 HTML、CSS、JavaScript 必須完整寫在同一個 `.html` 檔案中；禁止要求使用者安裝 Node.js、npm 或任何本機建置工具；不依賴不穩定的外部圖片連結，確保**離線也能正常運作**。
+2. **全繁體中文（台灣用語）**：所有介面文字、按鈕、提示訊息與程式碼中的主要區塊註解皆使用台灣習慣的繁體中文。
+3. **響應式設計（RWD）**：預設使用 Flexbox / CSS Grid 排版，確保桌機寬螢幕與手機直式螢幕皆美觀好操作。
+4. **程式碼乾淨可讀**：在 `<style>`、`<main>`、`<script>` 等關鍵區塊加上簡短中文註解，方便有興趣的學員閱讀理解。</textarea>
+    </section>
+
+    <footer class="shrine-footer">
+      ⛩️ 零門檻單檔網頁開發神社・願你的每一次存檔都一次成功
+    </footer>
+  </main>
+
+  <!-- 複製成功提示 -->
+  <div class="toast" id="toast">✨ 已奉納複製完整提示詞！可直接貼給 AI 開始對話</div>
+
+  <script>
+    /* =========================================
+       1. 靈感御神籤資料庫與搖籤互動
+       ========================================= */
+    const omikujiPool = [
+      {
+        rank: "大吉・開運",
+        category: "類型 A：互動遊戲類",
+        idea: "「午餐吃什麼？命運拉霸機」",
+        tip: "導師心法：先從輸入 5 個常吃餐廳與隨機抽出開始（MVP），V2 再加上權重與排除昨天吃過的選項！"
+      },
+      {
+        rank: "大吉・精進",
+        category: "類型 B：實用工具類",
+        idea: "「極簡雙階段專注番茄鐘」",
+        tip: "導師心法：25 分鐘專注 + 5 分鐘休息，搭配瀏覽器內建 Web Audio 合成清脆提示鈴聲，不需任何外部音檔。"
+      },
+      {
+        rank: "中吉・招福",
+        category: "類型 C：展示網頁類",
+        idea: "「個人專屬數位名片與作品集」",
+        tip: "導師心法：放上 3 個得意作品卡片與 Email 一鍵複製按鈕，手機寬度 375px 自動轉單欄最優雅。"
+      },
+      {
+        rank: "大吉・巧思",
+        category: "類型 A：互動遊戲類",
+        idea: "「成語／單字翻牌記憶挑戰」",
+        tip: "導師心法：記得在卡片翻開比對的 0.8 秒動畫期間鎖定點擊，就能完美避免連點造成狀態錯亂。"
+      },
+      {
+        rank: "上吉・聚財",
+        category: "類型 B：實用工具類",
+        idea: "「咖啡廳每日花費隨手記帳本」",
+        tip: "導師心法：整合 localStorage 自動保存，並加上一鍵匯出 UTF-8 BOM CSV 功能，用 Excel 打開絕不亂碼。"
+      },
+      {
+        rank: "大吉・心法",
+        category: "開發鐵則・MVP 護身符",
+        idea: "「一次只改一件事，改版必存 v2.html」",
+        tip: "導師心法：先求有再求好！V1 跑通核心 3 功能後，每次升級前先另存新檔備份，永遠不怕改壞。"
+      }
+    ];
+
+    const drawBtn = document.getElementById("drawBtn");
+    const shakerIcon = document.getElementById("shakerIcon");
+    const fortuneSlip = document.getElementById("fortuneSlip");
+    const fortuneRank = document.getElementById("fortuneRank");
+    const fortuneCategory = document.getElementById("fortuneCategory");
+    const fortuneIdea = document.getElementById("fortuneIdea");
+    const fortuneTip = document.getElementById("fortuneTip");
+    let isShaking = false;
+    let lastIndex = -1;
+
+    // 合成清脆神社鈴聲 (Web Audio API，零外部檔案)
+    function playShrineBell() {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(1318.5, ctx.currentTime); // E6 清脆鈴音
+        osc.frequency.exponentialRampToValueAtTime(1760, ctx.currentTime + 0.08);
+        gain.gain.setValueAtTime(0.12, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.65);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.65);
+      } catch (e) {
+        // 忽略不支援音效的環境
+      }
+    }
+
+    drawBtn.addEventListener("click", () => {
+      if (isShaking) return;
+      isShaking = true;
+      shakerIcon.classList.add("shaking");
+      playShrineBell();
+
+      setTimeout(() => {
+        shakerIcon.classList.remove("shaking");
+        let idx;
+        do {
+          idx = Math.floor(Math.random() * omikujiPool.length);
+        } while (idx === lastIndex && omikujiPool.length > 1);
+        lastIndex = idx;
+
+        const item = omikujiPool[idx];
+        fortuneRank.textContent = item.rank;
+        fortuneCategory.textContent = item.category;
+        fortuneIdea.textContent = item.idea;
+        fortuneTip.textContent = item.tip;
+
+        // 重新觸發出現動畫
+        fortuneSlip.style.display = "none";
+        void fortuneSlip.offsetWidth;
+        fortuneSlip.style.display = "block";
+        isShaking = false;
+      }, 560);
+    });
+
+    /* =========================================
+       2. 一鍵複製完整提示詞與頁籤切換
+       ========================================= */
+    const rawPromptText = document.getElementById("rawPromptText");
+    const toast = document.getElementById("toast");
+    let toastTimer = null;
+
+    function showToast(msg) {
+      toast.textContent = msg;
+      toast.classList.add("show");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toast.classList.remove("show");
+      }, 2600);
+    }
+
+    async function copyFullPrompt() {
+      const text = rawPromptText.value;
+      try {
+        await navigator.clipboard.writeText(text);
+        showToast("✨ 已奉納複製完整提示詞！可直接貼給 AI 開始對話");
+      } catch (err) {
+        rawPromptText.style.display = "block";
+        rawPromptText.select();
+        document.execCommand("copy");
+        showToast("✨ 已複製完整提示詞！");
+      }
+    }
+
+    document.getElementById("copyPromptBtn").addEventListener("click", copyFullPrompt);
+    document.getElementById("copyPromptBtn2").addEventListener("click", copyFullPrompt);
+
+    // 切換「籤詩排版閱讀」與「原始 Markdown」
+    const tabBtns = document.querySelectorAll(".tab-btn");
+    const formattedView = document.getElementById("formattedView");
+
+    tabBtns.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        tabBtns.forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        const mode = btn.dataset.tab;
+        if (mode === "formatted") {
+          formattedView.style.display = "block";
+          rawPromptText.style.display = "none";
+        } else {
+          formattedView.style.display = "none";
+          rawPromptText.style.display = "block";
+        }
+      });
+    });
+
+    /* =========================================
+       3. 輕量櫻花飄落背景動畫 (Canvas)
+       ========================================= */
+    const canvas = document.getElementById("sakura-canvas");
+    const ctx = canvas.getContext("2d");
+    let width = (canvas.width = window.innerWidth);
+    let height = (canvas.height = window.innerHeight);
+
+    window.addEventListener("resize", () => {
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+    });
+
+    const petals = Array.from({ length: 22 }, () => ({
+      x: Math.random() * width,
+      y: Math.random() * height,
+      r: 4 + Math.random() * 4,
+      speedY: 0.6 + Math.random() * 0.9,
+      speedX: -0.4 + Math.random() * 0.8,
+      angle: Math.random() * Math.PI * 2,
+      spin: 0.01 + Math.random() * 0.02
+    }));
+
+    function renderSakura() {
+      ctx.clearRect(0, 0, width, height);
+      petals.forEach((p) => {
+        p.y += p.speedY;
+        p.x += p.speedX + Math.sin(p.angle) * 0.3;
+        p.angle += p.spin;
+
+        if (p.y > height + 10) {
+          p.y = -10;
+          p.x = Math.random() * width;
+        }
+        if (p.x > width + 10) p.x = -10;
+        if (p.x < -10) p.x = width + 10;
+
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.angle);
+        ctx.fillStyle = "rgba(235, 165, 175, 0.45)";
+        ctx.beginPath();
+        ctx.ellipse(0, 0, p.r, p.r * 0.55, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      });
+      requestAnimationFrame(renderSakura);
+    }
+    renderSakura();
+  </script>
+</body>
+</html>
